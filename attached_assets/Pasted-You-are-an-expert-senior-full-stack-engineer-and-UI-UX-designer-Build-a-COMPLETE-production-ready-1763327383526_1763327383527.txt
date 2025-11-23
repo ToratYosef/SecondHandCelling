@@ -1,0 +1,893 @@
+You are an expert senior full-stack engineer and UI/UX designer.
+
+Build a COMPLETE, production-ready **device buyback platform** called **“SecondHandCell”** using **Next.js 14 (App Router) + TypeScript + Tailwind CSS + shadcn/ui + Prisma + PostgreSQL + NextAuth + Stripe**.
+
+This is a REAL app, not a demo. **Do not leave TODOs or placeholders.** Implement every page, component, route, and piece of copy described below. If something is mentioned, create it.
+
+The app is for **end users who want to sell their phones, tablets, watches, etc.** to SecondHandCell. It includes:
+
+- Consumer quote builder + shipping flow
+- Customer accounts and order tracking
+- Admin portal for pricing, inspections, re-offers, shipments, and analytics
+
+---
+
+## TECH + ARCHITECTURE REQUIREMENTS
+
+- **Framework:** Next.js 14 with App Router (`app/` directory).
+- **Language:** TypeScript everywhere.
+- **Styling:** Tailwind CSS + shadcn/ui components. Clean, modern, light theme.
+- **DB:** PostgreSQL via Prisma ORM.
+- **Auth:** NextAuth with:
+  - Credentials provider (email + password).
+  - Roles: `"customer"`, `"admin"`, `"super_admin"`.
+- **Payments:** Stripe for optional payouts via card replacement/fee payments (e.g. user paying shipping upgrades, accessories returns, etc.). Payout to user is not via Stripe; record payout meta only.
+- **Forms & Validation:** React Hook Form + Zod.
+- **API Layer:** Next.js Route Handlers (`app/api/...`) for all CRUD, quote calculation, and flows.
+- **Directory structure:**
+  - `app/(public)/...` – marketing + quote builder (public)
+  - `app/(customer)/account/...` – logged-in customer area
+  - `app/(admin)/admin/...` – admin portal
+  - `lib/` – helpers, utilities, pricing logic, config
+  - `components/` – shared UI components
+
+All key features must be implemented so the project can run and be demo-ready.
+
+---
+
+## CORE BUSINESS CONCEPT
+
+**SecondHandCell** is a **device buyback site** where regular people and small businesses can:
+
+- Get an instant guaranteed quote for their device(s).
+- Lock in that offer for a certain time window.
+- Get a **free or discounted shipping label / mail-in kit**.
+- Ship devices in.
+- After inspection, accept or reject any re-offers (if condition mismatch).
+- Get paid (outside of app; we just record payout details).
+
+Admins manage:
+
+- Device catalog and buyback pricing logic.
+- Quote and order lifecycle.
+- Inspection results, re-offers, and payouts.
+- Shipping label metadata (fake integration just stored).
+- Content pages (FAQ, how it works, etc.) and system settings.
+- Analytics, audit logs, and customer support tickets.
+
+---
+
+## DATA MODELS (PRISMA)
+
+Create Prisma models at minimum:
+
+- `User`
+  - id, name, email (unique), passwordHash, role (`customer | admin | super_admin`), phone, createdAt, updatedAt, lastLoginAt, isActive, marketingOptIn (boolean).
+
+- `CustomerProfile`
+  - id, userId, defaultPayoutMethod (`paypal | bank_transfer | check | gift_card | other`), payoutDetailsJson (JSON, e.g., PayPal email, last 4 bank, etc.), defaultAddressId (nullable, FK to `Address`), createdAt, updatedAt.
+
+- `Address`
+  - id, userId (nullable for label-only addresses like kit destinations), type (`shipping | payout | other`), label, fullName, phone, street1, street2, city, state, postalCode, country, isDefault, createdAt, updatedAt.
+
+- `DeviceBrand`
+  - id, name (`Apple`, `Samsung`, etc.), slug, createdAt, updatedAt, isActive.
+
+- `DeviceFamily`
+  - id, brandId, name (`iPhone`, `Galaxy S`, `Pixel`), slug, createdAt, updatedAt, isActive.
+
+- `DeviceModel`
+  - id, brandId, familyId (nullable), name (`iPhone 13 Pro`), marketingName, sku, slug, imageUrl, year, networkTechnology (`5G | 4G | other | unknown`), createdAt, updatedAt, isActive.
+
+- `DeviceVariant`
+  - id, modelId, storageGb (integer), color, networkCarrier (`unlocked | att | verizon | tmobile | other | unknown`), hasEsim (boolean), createdAt, updatedAt, isActive.
+
+- `BuybackConditionProfile`
+  - id, code (`A | B | C | D | broken`), label (`Flawless`, `Good`, etc.), description, isBroken (boolean), createdAt, updatedAt, isActive.
+
+- `BuybackPricingRule`
+  - id, deviceVariantId, basePrice, currency, conditionProfileId, isBlacklistedEligible (boolean), financedDevicePenaltyAmount, noPowerPenaltyAmount, functionalIssuePenaltyAmount, crackedGlassPenaltyAmount, activationLockPenaltyAmount, minOfferAmount, maxOfferAmount, effectiveFrom, effectiveTo (nullable), isActive, createdAt, updatedAt.
+
+- `QuoteRequest`
+  - id, quoteNumber (unique human-friendly, e.g. `SHC-Q-000123`), userId (nullable for guest), email, name, phone, status (`draft | quoted | expired | converted_to_order | cancelled`), lockedUntil (offer expiry datetime), source (`guest | account`), createdAt, updatedAt, notesInternal, notesCustomer.
+
+- `QuoteLineItem`
+  - id, quoteRequestId, deviceModelId, deviceVariantId (nullable if unknown), imei (nullable), serialNumber (nullable), claimedConditionProfileId, claimedIssuesJson (JSON; booleans for cracked screen, powers on, etc.), initialOfferAmount, currency, calculatedAt, createdAt, updatedAt.
+
+- `SellOrder`
+  - id, orderNumber (unique, e.g. `SHC-S-000456`), userId (nullable if guest but created account later), quoteRequestId (nullable), status (`label_pending | awaiting_device | in_transit | received | under_inspection | reoffer_pending | customer_decision_pending | payout_pending | completed | cancelled | returned_to_customer`), createdAt, updatedAt, lockedInAt, lockedUntil, shipmentId (nullable), payoutStatus (`not_started | pending | paid | failed`), payoutMethod (`paypal | bank_transfer | check | gift_card | other`), payoutDetailsJson (JSON), totalOriginalOffer, totalFinalOffer, currency, notesInternal, notesCustomer.
+
+- `SellOrderItem`
+  - id, sellOrderId, quoteLineItemId (nullable), deviceModelId, deviceVariantId (nullable), imei (nullable), serialNumber (nullable), claimedConditionProfileId, claimedIssuesJson (JSON), originalOfferAmount, inspectedConditionProfileId (nullable), inspectedIssuesJson (JSON), inspectionNotes (nullable), finalOfferAmount (nullable), adjustmentReason (`condition_mismatch | blacklisted | financed | functional_issue | other | none`), customerDecision (`pending | accepted | rejected | returned`), createdAt, updatedAt.
+
+- `Shipment`
+  - id, sellOrderId, carrierName, serviceLevel, trackingNumber, labelUrl, labelCost, labelPaidBy (`company | customer`), shipFromAddressJson (JSON), shipToAddressJson (JSON), createdAt, updatedAt, droppedOffAt (nullable), deliveredAt (nullable), lastTrackingStatus (nullable).
+
+- `Payment`
+  - id, sellOrderId, stripePaymentIntentId (nullable; used only when customer pays for something), amount, currency, direction (`incoming_from_customer | outgoing_to_customer`), payoutReference (string or nullable), method (`card | wire | ach | paypal | check | other`), status (`pending | succeeded | failed | refunded`), processedAt (nullable), createdAt, updatedAt.
+
+- `SupportTicket`
+  - id, userId (nullable), sellOrderId (nullable), quoteRequestId (nullable), subject, description, status (`open | in_progress | closed`), priority (`low | medium | high`), createdAt, updatedAt, lastCustomerActivityAt, lastAgentActivityAt.
+
+- `SupportTicketMessage`
+  - id, ticketId, authorType (`customer | admin`), authorUserId (nullable for guest), message, isInternal (boolean), createdAt.
+
+- `Announcement`
+  - id, title, body, startsAt, endsAt, isActive, createdAt, updatedAt.
+
+- `Faq`
+  - id, question, answer, category (`general | pricing | shipping | payments | data_wipe`), displayOrder, isActive, createdAt, updatedAt.
+
+- `AuditLog`
+  - id, actorUserId (nullable), action, entityType, entityId, previousValues (JSON), newValues (JSON), createdAt.
+
+- `SiteSetting`
+  - id, key (unique), valueJson (JSON), updatedAt.
+
+Implement all migrations plus a seed script.
+
+---
+
+## PUBLIC / MARKETING & QUOTE PAGES (NO AUTH REQUIRED)
+
+These live under `app/(public)/...`. All pages must be responsive and use actual copy (no lorem ipsum).
+
+### 1. `/` – Home Page
+
+Sections:
+
+- **Hero**
+  - Headline: “Sell Your Device. Get Paid Fast.”
+  - Subheading: “SecondHandCell gives you instant quotes, free shipping, and honest inspections for phones, tablets, watches, and more.”
+  - Primary CTA button: “Get an Instant Offer” → `/sell`.
+  - Secondary CTA: “Track My Order” → `/track`.
+  - Show a hero card with a device mockup and a sample offer like “Up to $510 for iPhone 15 Pro”.
+
+- **How It Works**
+  - 4 steps with icons:
+    1. “Tell us what you’re selling” – choose device, carrier, storage, condition.
+    2. “Lock in your offer” – instant quote, guaranteed for X days (configurable).
+    3. “Ship it for free” – download label or request a mail-in kit.
+    4. “We inspect and pay you” – same day decisions once delivered.
+
+- **Why SecondHandCell**
+  - Cards:
+    - “Honest, transparent pricing” – explain no surprise fees.
+    - “Real-time market offers” – based on demand + condition.
+    - “Data protection first” – explain wipe guidance.
+    - “Fast payouts” – PayPal or bank transfer once accepted.
+
+- **Popular Devices**
+  - Grid of popular models:
+    - Example: iPhone 14 Pro, Galaxy S23, Apple Watch, iPad.
+    - Each card links to `/sell/device/[slug]`.
+
+- **Testimonials**
+  - 3 customer quotes with stars, names (first name + last initial), and device they sold.
+
+- **FAQ Teaser**
+  - 3 top questions linking to `/faq`.
+
+- **Footer**
+  - Links:
+    - Sell (`/sell`)
+    - How It Works (`/how-it-works`)
+    - FAQ (`/faq`)
+    - Track Order (`/track`)
+    - Contact / Support (`/support`)
+    - Terms (`/legal/terms`)
+    - Privacy (`/legal/privacy`)
+    - Data Wipe Guide (`/data-wipe`)
+  - Copyright year + brand name.
+
+---
+
+### 2. `/how-it-works`
+
+Explain the full process with visuals:
+
+- “1. Get your offer” – show screenshots/mock sections of the quote flow.
+- “2. Lock in and ship” – label options, time windows.
+- “3. Inspection and re-offers” – clearly describe:
+  - We inspect the device.
+  - If condition matches, you get the original offer.
+  - If not, we send a re-offer you can accept or decline.
+- “4. Get paid” – how payouts work and expected timelines.
+
+Include a FAQ subset and CTA buttons to `/sell`.
+
+---
+
+### 3. `/sell` – Start Selling
+
+This is the entry to the quote builder.
+
+- Show a search input: “Search by device or IMEI”.
+- Sections:
+  - **Browse by brand** – clickable brand logos (Apple, Samsung, etc.) → `/sell/brand/[slug]`.
+  - **Popular categories** – Phones, Tablets, Watches, Laptops.
+- A CTA: “Already started a quote?” linking to `/track` and `account` if logged in.
+
+---
+
+### 4. `/sell/brand/[slug]`
+
+List all `DeviceModel` for that brand, grouped by family (e.g. iPhone, iPad).
+
+Each card:
+
+- Model image.
+- Model name.
+- Subtext like “Best price up to $xxx” (pull from top `BuybackPricingRule`).
+- Clicking card → `/sell/device/[slug]`.
+
+Include filters (by category, year).
+
+---
+
+### 5. `/sell/device/[slug]` – Device Selection Wizard
+
+This is the main quote builder step-by-step.
+
+Sections:
+
+1. **Model summary**
+   - Brand, name, hero image, “Typical payout up to $xxx”.
+
+2. **Step 1: Choose Specs**
+   - Storage (buttons based on `DeviceVariant.storageGb`).
+   - Color (optional; if not critical, can be simple dropdown).
+   - Carrier:
+     - `Unlocked`, `AT&T`, `Verizon`, `T-Mobile`, `Other/Unknown`.
+   - When options selected, resolve or approximate `DeviceVariant`.
+
+3. **Step 2: Condition Questions**
+   - Use clear yes/no and multiple choice:
+     - Does the phone **power on**? (Yes/No)
+     - Is the **screen fully functional** (no major lines, touch works)? (Yes/No)
+     - Any cracks on screen or back glass? (None / Hairline / Major)
+     - Any **water damage** signs? (No / Not sure / Yes)
+     - Any major body damage? (No / Scratches / Dents / Severe)
+     - Are all buttons and cameras working? (Yes / Some issues)
+   - Live summary of “Our guess: Flawless / Good / Fair / Broken” mapped to `BuybackConditionProfile`.
+
+4. **Step 3: Activation & Finance**
+   - Is the device **paid off** or financed? (Paid off / Financed / Not sure).
+   - Is the device **blacklisted** or reported lost/stolen? (No / Yes / Not sure).
+   - Is **Find My iPhone / OEM activation lock** off? (Yes / No / Not sure).
+
+5. **Step 4: Offer Result**
+   - Show:
+     - Original base price.
+     - Adjustments: condition, financed, issues, etc.
+     - Final **instant offer** with currency, e.g. “We’ll pay: $275”.
+     - Offer expiry time: “Offer valid for 14 days if shipped within 5 days.”
+   - Show 2 options:
+     - “Continue as guest” – leads to mini checkout that creates `QuoteRequest` and `SellOrder`.
+     - “Sign in / Create account to save and track offers” – leads to `/login` or `/register` and then continues.
+
+When user clicks “Get This Offer”, go to `/sell/confirm` with details in state or query, then create DB records on confirm.
+
+---
+
+### 6. `/sell/confirm` – Confirm Offer & Collect Details
+
+- Show summary of:
+  - Device (model, storage, carrier, condition summary).
+  - Offer amount.
+  - Offer expiry.
+- Collect:
+  - Name, email, phone.
+  - Create account checkbox:
+    - If checked, ask for password and confirm.
+  - Shipping address fields or give selection if logged-in with saved addresses.
+  - Preferred payout method:
+    - PayPal (email field).
+    - Bank transfer (prompt for basic details, but store only summary in `payoutDetailsJson`).
+    - Check by mail (use address).
+    - Gift card (email).
+- On submit:
+  - Create `User` + `CustomerProfile` if new account.
+  - Create `QuoteRequest` with one or more `QuoteLineItem` (for now assume single device).
+  - Create `SellOrder` with status `label_pending` and `SellOrderItem`.
+  - Redirect to `/sell/shipping-options/[orderNumber]`.
+
+---
+
+### 7. `/sell/shipping-options/[orderNumber]`
+
+- Show options:
+  - “Print my own label” – free label: create `Shipment` with labelUrl (fake static URL or generated slug).
+  - “Mail-in kit” – if chosen, mark in `SellOrder` and `Shipment.shipToAddressJson`.
+  - “I’ll ship myself” – show instructions and allow them to mark tracking later.
+- For label options, show:
+  - Ship-from address (customer).
+  - Ship-to (SecondHandCell warehouse address from `SiteSetting`).
+- After user chooses option:
+  - Update `SellOrder.status` → `awaiting_device`.
+  - Show “Next steps” page: how to pack phone, backup & wipe data, remove SIM, etc.
+  - Provide label download link (if label option).
+
+---
+
+### 8. `/track` – Public Tracking Page
+
+- Input: “Order or Quote Number” + “Email”.
+- On submit:
+  - Look up `SellOrder` or `QuoteRequest`.
+  - Show:
+    - Status timeline:
+      - Offer created
+      - Label created
+      - Dropped off
+      - Delivered
+      - Under inspection
+      - Re-offer pending
+      - Payout sent
+    - Offer amount(s).
+    - Buttons:
+      - “View details in my account” for logged in.
+
+---
+
+### 9. `/faq`
+
+Use FAQs from `Faq` model grouped by category:
+
+- General
+- Pricing & Offers
+- Shipping & Packaging
+- Payments & Payouts
+- Data Wipe & Security
+
+Each FAQ is collapsible (accordion). Use realistic questions/answers (no lorem ipsum).
+
+---
+
+### 10. `/data-wipe`
+
+Dedicated page explaining:
+
+- How to backup & erase iPhone, Android, etc.
+- How to sign out of iCloud, Google, Samsung accounts.
+- Why it’s important (data security).
+- Provide step-by-step bullet lists and external link placeholders (no actual external links required but text can reference “Apple support” etc.). Make the copy real.
+
+---
+
+### 11. `/support` – Contact / Support Page
+
+- Left side:
+  - Explain support availability, typical response time.
+  - Email address from `SiteSetting`.
+- Right side:
+  - Form for guest tickets:
+    - Name, email, order/quote number (optional), subject, message.
+  - Creates `SupportTicket` + first `SupportTicketMessage`.
+  - Show confirmation text.
+
+---
+
+### 12. `/legal/terms` & `/legal/privacy`
+
+- Write real-looking Terms of Service and Privacy Policy text:
+  - Terms: explain that user must be lawful owner, device not stolen, etc.; disclaimers about final offers and condition mismatch.
+  - Privacy: data collected, how it is used, retention, cookies, third-party processors, contact.
+
+---
+
+### 13. Global error pages
+
+- Root `not-found.tsx` – 404 with link back home.
+- Root `error.tsx` – generic error with “Try again” button.
+
+---
+
+## AUTH & CUSTOMER ACCOUNT PAGES
+
+### 14. `/login`
+
+- Email + password form.
+- “Keep me signed in” checkbox.
+- Links to:
+  - “Create account” → `/register`
+  - “Forgot password?” → `/forgot-password`
+- On login:
+  - Customers → `/account/overview`
+  - Admins → `/admin/dashboard`
+
+### 15. `/register`
+
+- Simple account registration:
+  - Name, email, phone, password + confirm.
+  - Optional: prefill if coming from a quote (prefill email).
+  - On success:
+    - Create `User` + `CustomerProfile`.
+    - Redirect to `/account/overview`.
+
+### 16. `/forgot-password` & `/reset-password/[token]`
+
+- Implement same flow as in the wholesale prompt:
+  - Store reset token and expiration.
+  - Input new password, validate token, update passwordHash.
+
+---
+
+## CUSTOMER PORTAL (`app/(customer)/account/...`)
+
+Shared layout with sidebar:
+
+- Overview
+- My Offers
+- Orders & Status
+- Payout Methods
+- Addresses
+- Support
+
+### 17. `/account/overview`
+
+Show:
+
+- Welcome message with name.
+- Quick stats:
+  - Number of active offers.
+  - Devices en route / under inspection.
+  - Last payout amount and date.
+- Timeline or cards:
+  - “Your latest order” with status and CTA “View details”.
+- Show any active announcements.
+
+### 18. `/account/offers` – My Offers & Quotes
+
+- List of `QuoteRequest` for user (including those converted into orders).
+  - Columns:
+    - Quote number, device summary, original offer, created date, status, expiry.
+  - Badge showing “Expires in X days” or “Expired”.
+  - Filter by status.
+- Each row links to `/account/offers/[quoteNumber]`.
+
+### 19. `/account/offers/[quoteNumber]`
+
+- Details of `QuoteRequest` and `QuoteLineItem`s:
+  - Device details.
+  - Claimed condition summary.
+  - Offer breakdown.
+- Show if there is an associated `SellOrder`:
+  - Link to that order.
+- If quote is still `draft` or `quoted` and not converted:
+  - Button: “Turn this offer into a shipment” → new `SellOrder` & shipping flow (similar to `/sell/shipping-options/...`).
+
+### 20. `/account/orders` – Sell Orders List
+
+- Table of `SellOrder`:
+  - Columns:
+    - Order number
+    - Created date
+    - Status (colored badges)
+    - Original offer total
+    - Final offer total (if available)
+    - Payout status
+  - Filter by status (active, completed, cancelled).
+
+Each row → `/account/orders/[orderNumber]`.
+
+### 21. `/account/orders/[orderNumber]`
+
+Show full order details:
+
+- Header:
+  - Status timeline with steps visually highlighted.
+- Items:
+  - For each `SellOrderItem`, show:
+    - Device, IMEI (masked), claimed vs inspected condition, original vs final offer.
+- Shipment:
+  - Carrier, tracking number (link out), latest status.
+- Payout:
+  - Payout method, amount, status, payout reference if any.
+- Re-offer interaction:
+  - If `SellOrderItem` or entire order is in `reoffer_pending` or `customer_decision_pending`:
+    - Show original vs new offer.
+    - Buttons: “Accept new offer” and “Reject and return my device”.
+    - On accept:
+      - Update item/order `customerDecision` and `status`.
+    - On reject:
+      - Mark status accordingly and show that device will be shipped back.
+
+### 22. `/account/payout-methods`
+
+- Show current default payout method from `CustomerProfile`.
+- Form to update:
+  - Choose method.
+  - Show method-specific fields (PayPal email, bank info description, etc.).
+- Save to `CustomerProfile.payoutDetailsJson`.
+
+### 23. `/account/addresses`
+
+- List of addresses for user:
+  - Identify default address; used for shipments and checks.
+- Add/edit/remove addresses with validation.
+- Mark default.
+
+### 24. `/account/settings`
+
+- User preferences:
+  - Name, phone.
+  - Email notification toggles:
+    - “Offer updates”
+    - “Shipment updates”
+    - “Payout updates”
+  - Delete account flow (soft deactivate `User.isActive`).
+
+### 25. `/account/support`
+
+- Customer ticket overview:
+  - Table:
+    - Ticket ID, subject, status, last updated.
+  - Button: “Open a new ticket”.
+- New ticket form:
+  - Subject, message, optional order/quote selection dropdown.
+
+### 26. `/account/support/[ticketId]`
+
+- Ticket detail:
+  - Make conversation thread UI:
+    - Messages from customer vs admin.
+  - Form to reply.
+  - Show ticket status and priority.
+  - Allow customer to mark as resolved/closed.
+
+---
+
+## ADMIN PORTAL (`app/(admin)/admin/...`)
+
+Admin layout with sidebar:
+
+- Dashboard
+- Devices & Pricing
+- Offers & Orders
+- Inspections & Re-Offers
+- Shipments
+- Payouts
+- Customers & Users
+- Support
+- Content
+- Settings
+- Audit Logs
+
+### 27. `/admin/dashboard`
+
+Show:
+
+- Cards:
+  - “Offers created today”
+  - “Devices received this week”
+  - “Payouts sent this week ($)”
+  - “Re-offers awaiting customer decision”
+- Chart:
+  - Offers vs completed payouts by day.
+- Recent activity from `AuditLog`.
+
+### 28. `/admin/devices/models`
+
+- List all `DeviceModel`:
+  - Brand, Name, Year, Active.
+  - Search by name, filter by brand.
+  - Actions:
+    - New model → `/admin/devices/models/new`.
+    - Edit → `/admin/devices/models/[id]`.
+
+### 29. `/admin/devices/models/new` & `/admin/devices/models/[id]`
+
+- Form to create/edit:
+  - Brand, family, name, marketingName, SKU, year, category (phone/tablet/watch).
+  - ImageUrl, description.
+  - isActive toggle.
+- Show linked variants and quick links to pricing.
+
+### 30. `/admin/devices/variants`
+
+- Combined table from `DeviceVariant`:
+  - Columns:
+    - Brand, Model, Storage, Carrier, Color, Active.
+  - Filters: brand, carrier, active.
+  - Actions:
+    - New variant → `/admin/devices/variants/new`.
+    - Edit → `/admin/devices/variants/[id]`.
+
+### 31. `/admin/devices/variants/new` & `/admin/devices/variants/[id]`
+
+- Form for variant details.
+- Section for **pricing rules**:
+  - List all `BuybackPricingRule` entries for this variant by condition.
+  - Editable table:
+    - Condition profile, basePrice, penalties, min/max offer, active window.
+  - Buttons to add/delete rules.
+
+---
+
+### 32. `/admin/offers` – Quotes
+
+- Table of `QuoteRequest`:
+  - Columns: Quote number, customer (name/email), created date, status, total initial offer (sum).
+  - Filters: status, created date.
+  - Clicking row → `/admin/offers/[quoteNumber]`.
+
+### 33. `/admin/offers/[quoteNumber]`
+
+- Show quote details:
+  - Customer info.
+  - Items with device + estimated offers.
+- Admin actions:
+  - Add internal notes.
+  - Cancel quote.
+  - Convert to `SellOrder` or link to existing order.
+
+---
+
+### 34. `/admin/orders`
+
+- Table of `SellOrder`:
+  - Order number, customer, status, shipment status, payout status, totals.
+  - Filters: status, payoutStatus, date range.
+- Each → `/admin/orders/[orderNumber]`.
+
+### 35. `/admin/orders/[orderNumber]`
+
+- Admin view:
+  - Full order info.
+  - Edit fields:
+    - Status (dropdown with allowed transitions).
+    - Notes internal.
+  - Links to:
+    - Inspection view for each item.
+    - Shipment detail.
+    - Payout detail.
+
+---
+
+### 36. `/admin/inspections`
+
+- List of `SellOrderItem` needing inspection:
+  - Columns:
+    - Order number, device, claimed condition, current status, created date.
+  - Filters: status (under_inspection, reoffer_pending, etc.).
+- Each → `/admin/inspections/[itemId]`.
+
+### 37. `/admin/inspections/[itemId]`
+
+- Show:
+  - Claimed condition & issues.
+  - Admin fields to record:
+    - Inspected condition profile.
+    - Observed issues (checkboxes / booleans).
+    - Notes.
+  - Automatically calculate finalOfferAmount using `BuybackPricingRule` + penalties.
+- Actions:
+  - “Approve original offer and pay” – set finalOfferAmount = originalOfferAmount, mark item accepted, propagate to order.
+  - “Create re-offer” – set new finalOfferAmount and update order/item statuses to reoffer_pending; send notification (simulate by storing timestamp).
+  - “Reject device / Return to customer” – mark status, trigger return shipment.
+
+---
+
+### 38. `/admin/shipments`
+
+- Table of `Shipment`:
+  - Columns: Order number, carrier, tracking, status, dates.
+  - Filters: delivered vs in transit.
+- For each:
+  - Click → `/admin/shipments/[id]`.
+
+### 39. `/admin/shipments/[id]`
+
+- Show full shipment info:
+  - Label URL.
+  - Ship from/to addresses.
+  - Dates (created, dropped off, delivered).
+  - Tracking log area (optional stub).
+- Admin actions:
+  - Update tracking status manually.
+  - Mark delivered.
+
+---
+
+### 40. `/admin/payouts`
+
+- Aggregated view of all `Payment` with `direction = outgoing_to_customer`:
+  - Columns: Order number, amount, method, status, processedAt.
+  - Filters: status, method, date.
+- Ability to:
+  - Mark payout as “paid” or “failed”.
+  - Add payout reference (PayPal ID, bank reference, check number).
+  - Link to `/admin/orders/[orderNumber]`.
+
+---
+
+### 41. `/admin/customers`
+
+- Table of customers (`User` with role=customer):
+  - Name, email, phone, created date, last login.
+  - Number of orders, total payouts.
+- Each row → `/admin/customers/[id]`.
+
+### 42. `/admin/customers/[id]`
+
+- Customer profile:
+  - Contact info.
+  - Payout methods summary.
+  - Addresses.
+  - List of orders and offers.
+- Admin actions:
+  - Deactivate account.
+  - Add internal notes (store via `AuditLog` or extended field).
+
+---
+
+### 43. `/admin/support`
+
+- Table of all support tickets:
+  - Ticket id, subject, customer, status, priority, last updated.
+  - Filters by status/priority.
+- Each → `/admin/support/[ticketId]`.
+
+### 44. `/admin/support/[ticketId]`
+
+- Full ticket view:
+  - Show messages (customer vs admin vs internal).
+  - Form to send new message and mark as internal or public.
+  - Change status and priority.
+
+---
+
+### 45. `/admin/content/announcements`
+
+- Manage `Announcement`:
+  - List: title, active status, date range.
+  - New/edit form for title, body, start/end, isActive.
+- Announcements appear on:
+  - Home page banner.
+  - `/account/overview` dashboard.
+
+### 46. `/admin/content/faqs`
+
+- Manage FAQ entries:
+  - List by category.
+  - Create/edit/delete question & answer.
+- Renders on `/faq`.
+
+---
+
+### 47. `/admin/settings/general`
+
+- General site settings stored in `SiteSetting`:
+  - Offer validity days (e.g. 14).
+  - Days allowed to ship after quote is created (e.g. 5).
+  - Support email.
+  - Warehouse address (serialized as JSON).
+  - Default shipping carrier name.
+
+Provide a form to edit and save these.
+
+### 48. `/admin/settings/integrations`
+
+- Integration config values:
+  - Stripe publishable key (masked).
+  - Stripe secret key (masked).
+- Basic forms to update `SiteSetting` entries.
+
+---
+
+### 49. `/admin/logs/audit`
+
+- Paginated list of `AuditLog`:
+  - Columns: time, actor, action, entityType, entityId, short summary.
+  - Filters: actor, entity type, date range.
+- Click row → detail drawer showing previous vs new values.
+
+---
+
+## GLOBAL COMPONENTS & BEHAVIOR
+
+Implement shared components:
+
+- **PublicHeader** – for `(public)` routes:
+  - Logo “SecondHandCell”.
+  - Links: Sell, How It Works, FAQ, Track Order, Support.
+  - “Login” / “My Account” (if authenticated).
+
+- **PublicFooter** – consistent footer with all legal links.
+
+- **AccountLayout** – sidebar layout for `/account/...` with:
+  - Overview
+  - Offers
+  - Orders
+  - Payout Methods
+  - Addresses
+  - Support
+  - Settings
+  - Logout
+
+- **AdminLayout** – for `/admin/...` with sidebar:
+  - Dashboard
+  - Devices
+  - Offers
+  - Orders
+  - Inspections
+  - Shipments
+  - Payouts
+  - Customers
+  - Support
+  - Content
+  - Settings
+  - Logs
+  - Logout
+
+- **Toasts / Notifications** using shadcn/ui to display success/error info.
+
+- **Middleware / route protection:**
+  - Unauthenticated access to `account` or `admin` redirects to `/login`.
+  - Customers cannot access admin; redirect and show error toast.
+  - Admin routes require `admin` or `super_admin` role.
+
+---
+
+## PRICING LOGIC IMPLEMENTATION
+
+Implement a central helper in `lib/pricing.ts`:
+
+- `calculateInstantOffer(options: { deviceVariant, conditionAnswers, financeStatus, blacklistStatus, activationLockStatus }): { conditionProfile, basePrice, adjustments: { label, amount }[], finalOffer }`
+
+Use `BuybackPricingRule` + heuristics:
+
+- Start from basePrice of matching conditionProfile.
+- Apply penalties:
+  - financedDevicePenaltyAmount if financed.
+  - noPowerPenaltyAmount if doesn’t power on.
+  - crackedGlassPenaltyAmount for cracks.
+  - functionalIssuePenaltyAmount for major hardware issues.
+  - activationLockPenaltyAmount if locked.
+- Clamp between `minOfferAmount` and `maxOfferAmount`.
+- Return full breakdown to display to user.
+
+Use this helper in:
+
+- `/sell/device/[slug]` offer calculation.
+- Admin inspection final offer calculation.
+
+---
+
+## SEED DATA
+
+Create a Prisma seed script that:
+
+- Creates:
+  - One `super_admin` user:
+    - Email: `admin@secondhandcell.test`
+    - Password: `Admin123!`
+  - A demo customer user:
+    - Email: `customer@secondhandcell.test`
+    - Password: `Customer123!`
+- Seeds:
+  - Brands: Apple, Samsung, Google.
+  - A handful of models and variants:
+    - iPhone 13, iPhone 14, Galaxy S22, Pixel 7.
+  - Condition profiles: Flawless (A), Good (B), Fair (C), Broken.
+  - BuybackPricingRules for those variants.
+  - A few sample quotes, orders, shipments, payouts, and tickets.
+
+---
+
+## FINAL REQUIREMENTS
+
+- All forms must have client + server validation and friendly error messages.
+- Avoid lorem ipsum; write concise, real-sounding copy.
+- Use strong typing across the app.
+- Ensure navigation links are correct.
+- Implement basic mobile responsiveness.
+
+The project must run with:
+
+1. `npm install`
+2. `npx prisma migrate dev`
+3. `npm run dev`
+
+Return all relevant code files and configuration needed for the complete project.

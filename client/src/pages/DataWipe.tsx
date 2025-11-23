@@ -1,0 +1,287 @@
+import { PublicHeader } from "@/components/PublicHeader";
+import { PublicFooter } from "@/components/PublicFooter";
+import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ShieldCheck, AlertTriangle, CheckCircle2 } from "lucide-react";
+
+export default function DataWipe() {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <PublicHeader />
+      
+      <main className="flex-1">
+        <section className="py-16 bg-gradient-to-b from-primary/5 to-background">
+          <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <div className="max-w-3xl mx-auto text-center">
+              <ShieldCheck className="w-16 h-16 text-primary mx-auto mb-6" />
+              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
+                Data Wipe Guide
+              </h1>
+              <p className="text-xl text-muted-foreground">
+                Protect your privacy by properly erasing all personal data before shipping your device
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16">
+          <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <div className="max-w-4xl mx-auto">
+              <Alert className="mb-12 border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                <AlertDescription className="text-sm ml-2">
+                  <strong>Important:</strong> Failure to properly wipe your device and disable activation locks will delay your payout. Devices with active locks will be returned to you at no charge.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-12">
+                {/* iPhone/iPad */}
+                <Card className="p-8">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span className="text-4xl">🍎</span>
+                    iPhone & iPad
+                  </h2>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Step 1: Backup Your Data</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Connect to Wi-Fi and go to Settings → [Your Name] → iCloud → iCloud Backup</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Tap "Back Up Now" and wait for completion</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Alternatively, backup to iTunes/Finder on your computer</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Step 2: Sign Out of iCloud (Critical!)</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Go to Settings → [Your Name] → Scroll to bottom → "Sign Out"</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Enter your Apple ID password when prompted</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>This will automatically disable "Find My iPhone"</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Step 3: Erase All Content and Settings</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Go to Settings → General → Transfer or Reset iPhone</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Tap "Erase All Content and Settings"</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Enter your passcode and confirm the erase</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Step 4: Remove from Apple Account (If Already Shipped)</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Visit iCloud.com and sign in with your Apple ID</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Go to "Find My iPhone" → All Devices</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Select your device and click "Remove from Account"</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Android */}
+                <Card className="p-8">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span className="text-4xl">🤖</span>
+                    Android (Samsung, Google Pixel, etc.)
+                  </h2>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Step 1: Backup Your Data</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Go to Settings → System → Backup</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Tap "Back up now" to save to Google Drive</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Backup photos to Google Photos or your computer</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Step 2: Remove Google Account</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Go to Settings → Passwords & accounts (or Accounts)</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Select your Google account and tap "Remove account"</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>For Samsung: Also remove your Samsung account</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Step 3: Disable Find My Device</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Go to Settings → Security → Find My Device</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Toggle OFF and enter your password</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Step 4: Factory Reset</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Go to Settings → System → Reset options</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Tap "Erase all data (factory reset)"</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Enter your PIN/password and confirm</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Apple Watch */}
+                <Card className="p-8">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span className="text-4xl">⌚</span>
+                    Apple Watch
+                  </h2>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Option 1: Unpair from iPhone (Recommended)</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Open the Watch app on your iPhone</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Go to "All Watches" and tap the (i) next to your watch</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Tap "Unpair Apple Watch" and confirm</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>This automatically disables Activation Lock</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Option 2: Erase on Watch</h3>
+                      <ul className="space-y-2 text-sm text-muted-foreground ml-6">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>On the watch: Settings → General → Reset</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Tap "Erase All Content and Settings"</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                          <span>Enter your passcode and confirm</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Final Checklist */}
+                <Card className="p-8 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                  <h2 className="text-2xl font-bold mb-6">Final Checklist Before Shipping</h2>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                      <span className="text-sm">Backed up all important photos, contacts, and data</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                      <span className="text-sm">Signed out of all accounts (iCloud, Google, Samsung, etc.)</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                      <span className="text-sm">Disabled Find My iPhone/Find My Device/Activation Lock</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                      <span className="text-sm">Performed factory reset to erase all content and settings</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                      <span className="text-sm">Removed SIM card and any memory cards</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                      <span className="text-sm">Removed case and screen protector (device only)</span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <PublicFooter />
+    </div>
+  );
+}
