@@ -4,9 +4,10 @@
     <meta charset="utf-8">
     <title>SecondHandCell</title>
     <script type="text/javascript">
-      // Redirect to root - let the SPA router handle the path
-      window.location.replace('/' + window.location.search + window.location.hash);
+      // Store the current path and redirect to index.html with it
+      sessionStorage.redirect = location.pathname + location.search + location.hash;
     </script>
+    <meta http-equiv="refresh" content="0;URL='/'"></meta>
   </head>
   <body>
   </body>
