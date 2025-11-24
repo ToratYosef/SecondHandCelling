@@ -3,14 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
+import { getApiUrl } from "@/lib/api";
+
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string>("");
   // Fetch sitewide logo
   useState(() => {
-    fetch("/api/settings").then(res => res.json()).then(data => {
+    fetch(getApiUrl("/api/settings")).then(res => res.json()).then(data => {
       if (data.logoUrl) setLogoUrl(data.logoUrl);
-    });
+    }).catch(() => {});
   });
 
   return (

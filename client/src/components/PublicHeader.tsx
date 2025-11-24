@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Smartphone, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
+import { getApiUrl } from "@/lib/api";
+
 export function PublicHeader() {
   const [logoUrl, setLogoUrl] = useState<string>("");
   useState(() => {
-    fetch("/api/settings").then(res => res.json()).then(data => {
+    fetch(getApiUrl("/api/settings")).then(res => res.json()).then(data => {
       if (data.logoUrl) setLogoUrl(data.logoUrl);
-    });
+    }).catch(() => {});
   });
 
   return (
