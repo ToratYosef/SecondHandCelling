@@ -35,10 +35,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'https://shc-api.onrender.com',
+        target: process.env.VITE_API_URL || 'https://api.secondhandcell.com',
         changeOrigin: true,
         secure: true,
-        credentials: 'include',
       },
     },
     fs: {
