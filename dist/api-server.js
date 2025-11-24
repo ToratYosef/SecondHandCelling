@@ -2946,14 +2946,7 @@ var app = express();
 var PORT = process.env.PORT || 8032;
 var allowedOrigins = process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",") : ["https://toratyosef.github.io", "https://beta.secondhandcell.com"];
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === "development") {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: allowedOrigins.length > 0 ? allowedOrigins : true,
   credentials: true
 }));
 var Store = SQLiteStore(session);
@@ -2964,66 +2957,34 @@ app.use(
       dir: "./",
       clear_expired: true,
       checkExpirationInterval: 9e5
-      // Check for expired sessions every 15 minutes
     }),
     secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1e3,
-      // 30 days
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
     }
   })
 );
-app.use(express.json({
-  limit: "20mb",
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
-app.use(express.urlencoded({ extended: false, limit: "20mb" }));
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      const formattedTime = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true
-      });
-      console.log(`${formattedTime} [express] ${req.method} ${path} ${res.statusCode} in ${duration}ms`);
-    }
-  });
-  next();
-});
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+var server = await registerRoutes(app);
 app.get("/", (req, res) => {
   res.json({
     status: "ok",
-    message: "SecondHandCell API server running",
-    version: "1.0.0",
+    message: "API server running",
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-app.get("/health", (req, res) => {
-  res.json({ status: "healthy" });
+app.use((err, _req, res, _next) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  console.error(`Error: ${message}`, err);
+  res.status(status).json({ message });
 });
-(async () => {
-  const server = await registerRoutes(app);
-  app.use((err, _req, res, _next) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    console.error(`Error: ${message}`, err);
-    res.status(status).json({ message });
-  });
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`\u2705 API server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-    console.log(`CORS Origins: ${allowedOrigins.join(", ")}`);
-  });
-})();
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`\u2705 API server running on port ${PORT}`);
+});

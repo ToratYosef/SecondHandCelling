@@ -1,33 +1,33 @@
-import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
-import SQLiteStore from "connect-sqlite3";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-// Session configuration with SQLite Store
-const Store = SQLiteStore(session);
-app.use(
-  session({
-    store: new Store({
-      db: "sessions.db",
-      dir: "./",
-      clear_expired: true,
-      checkExpirationInterval: 900000, // Check for expired sessions every 15 minutes
-    }),
-    secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    },
-  })
-);
+app.set("trust proxy", 1);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+
+  res.header("Vary", "Origin");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 
 declare module 'http' {
   interface IncomingMessage {
@@ -35,12 +35,11 @@ declare module 'http' {
   }
 }
 app.use(express.json({
-  limit: "20mb",
   verify: (req, _res, buf) => {
     req.rawBody = buf;
   }
 }));
-app.use(express.urlencoded({ extended: false, limit: "20mb" }));
+app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -88,7 +87,7 @@ app.use((req, res, next) => {
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
-  } else if (process.env.API_ONLY !== "true") {
+  } else {
     serveStatic(app);
   }
 

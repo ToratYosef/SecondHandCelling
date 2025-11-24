@@ -1,10 +1,11 @@
-import { defineConfig } from "drizzle-kit";
+import "dotenv/config";
+import type { Config } from "drizzle-kit";
 
-export default defineConfig({
-  out: "./migrations",
+export default {
   schema: "./shared/schema.ts",
-  dialect: "sqlite",
+  out: "./drizzle",
+  dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "sqlite.db",
+    url: process.env.DATABASE_URL || "postgresql://neondb_owner:npg_zyuokg5L6ACf@ep-cool-violet-a4ea6weg-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require",
   },
-});
+} satisfies Config;

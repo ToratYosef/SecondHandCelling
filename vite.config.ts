@@ -33,6 +33,14 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_URL || 'https://shc-api.onrender.com',
+        changeOrigin: true,
+        secure: true,
+        credentials: 'include',
+      },
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],

@@ -1,438 +1,556 @@
-// DatabaseStorage implementation from blueprint:javascript_database
 import { db } from "./db";
-import { eq, and, or, isNull, lte, gte } from "drizzle-orm";
-import {
-  users,
-  deviceBrands,
-  deviceModels,
-  deviceVariants,
-  buybackConditionProfiles,
-  buybackPricingRules,
-  quoteRequests,
-  quoteLineItems,
-  sellOrders,
-  sellOrderItems,
-  shipments,
-  payments,
-  type User,
-  type InsertUser,
-  type DeviceBrand,
-  type InsertDeviceBrand,
-  type DeviceModel,
-  type InsertDeviceModel,
-  type DeviceVariant,
-  type InsertDeviceVariant,
-  type BuybackConditionProfile,
-  type InsertBuybackConditionProfile,
-  type BuybackPricingRule,
-  type InsertBuybackPricingRule,
-  type QuoteRequest,
-  type InsertQuoteRequest,
-  type QuoteLineItem,
-  type InsertQuoteLineItem,
-  type SellOrder,
-  type InsertSellOrder,
-  type SellOrderItem,
-  type InsertSellOrderItem,
+import { eq, and, desc, sql } from "drizzle-orm";
+import type { 
+  User, InsertUser,
+  Company, InsertCompany,
+  CompanyUser, InsertCompanyUser,
+  DeviceCategory, InsertDeviceCategory,
+  DeviceModel, InsertDeviceModel,
+  DeviceVariant, InsertDeviceVariant,
+  InventoryItem, InsertInventoryItem,
+  PriceTier, InsertPriceTier,
+  Cart, InsertCart,
+  CartItem, InsertCartItem,
+  Order, InsertOrder,
+  OrderItem, InsertOrderItem,
+  ShippingAddress, InsertShippingAddress,
+  BillingAddress, InsertBillingAddress,
+  Quote, InsertQuote,
+  QuoteItem, InsertQuoteItem,
+  SavedList, InsertSavedList,
+  SavedListItem, InsertSavedListItem,
+  Payment, InsertPayment,
+  Shipment, InsertShipment,
+  Faq, InsertFaq,
+  Announcement, InsertAnnouncement,
+  SupportTicket, InsertSupportTicket,
+  AuditLog, InsertAuditLog,
 } from "@shared/schema";
+import * as schema from "@shared/schema";
 
 export interface IStorage {
-    // Shipments
-    getShipment(id: string): Promise<any>;
-    getShipmentByOrder(orderId: string): Promise<any>;
-    createShipment(shipment: any): Promise<any>;
-    updateShipment(id: string, updates: Partial<any>): Promise<any>;
-  // Users
+  // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
+  
+  // Company methods
+  getCompany(id: string): Promise<Company | undefined>;
+  createCompany(company: InsertCompany): Promise<Company>;
+  updateCompany(id: string, updates: Partial<Company>): Promise<Company | undefined>;
+  getAllCompanies(): Promise<Company[]>;
+  
+  // CompanyUser methods
+  createCompanyUser(companyUser: InsertCompanyUser): Promise<CompanyUser>;
+  getCompanyUsersByUserId(userId: string): Promise<CompanyUser[]>;
+  getCompanyUsersByCompanyId(companyId: string): Promise<CompanyUser[]>;
+  
+  // Device Category methods
+  getAllCategories(): Promise<DeviceCategory[]>;
+  getCategory(id: string): Promise<DeviceCategory | undefined>;
+  getCategoryBySlug(slug: string): Promise<DeviceCategory | undefined>;
+  createCategory(category: InsertDeviceCategory): Promise<DeviceCategory>;
+  
+  // Device Model methods
+  getAllDeviceModels(): Promise<DeviceModel[]>;
+  getDeviceModel(id: string): Promise<DeviceModel | undefined>;
+  getDeviceModelBySlug(slug: string): Promise<DeviceModel | undefined>;
+  createDeviceModel(model: InsertDeviceModel): Promise<DeviceModel>;
+  
+  // Device Variant methods
+  getDeviceVariant(id: string): Promise<DeviceVariant | undefined>;
+  getDeviceVariantsByModelId(modelId: string): Promise<DeviceVariant[]>;
+  createDeviceVariant(variant: InsertDeviceVariant): Promise<DeviceVariant>;
+  updateDeviceVariant(id: string, updates: Partial<DeviceVariant>): Promise<DeviceVariant | undefined>;
+  deleteDeviceVariant(id: string): Promise<void>;
+  
+  // Inventory methods
+  getInventoryByVariantId(variantId: string): Promise<InventoryItem | undefined>;
+  createInventory(inventory: InsertInventoryItem): Promise<InventoryItem>;
+  updateInventory(id: string, updates: Partial<InventoryItem>): Promise<InventoryItem | undefined>;
+  deleteInventoryByVariantId(variantId: string): Promise<void>;
 
-  // Device Brands
-  getAllBrands(): Promise<DeviceBrand[]>;
-  getBrand(id: string): Promise<DeviceBrand | undefined>;
-  getBrandBySlug(slug: string): Promise<DeviceBrand | undefined>;
-  createBrand(brand: InsertDeviceBrand): Promise<DeviceBrand>;
-  updateBrand(id: string, updates: Partial<DeviceBrand>): Promise<DeviceBrand | undefined>;
+  // Price Tier methods
+  getPriceTiersByVariantId(variantId: string): Promise<PriceTier[]>;
+  createPriceTier(tier: InsertPriceTier): Promise<PriceTier>;
+  updatePriceTier(id: string, updates: Partial<PriceTier>): Promise<PriceTier | undefined>;
+  deletePriceTiersByVariantId(variantId: string): Promise<void>;
 
-  // Device Models
-  getAllModels(): Promise<DeviceModel[]>;
-  getModel(id: string): Promise<DeviceModel | undefined>;
-  getModelBySlug(slug: string): Promise<DeviceModel | undefined>;
-  getModelsByBrand(brandId: string): Promise<DeviceModel[]>;
-  createModel(model: InsertDeviceModel): Promise<DeviceModel>;
-  updateModel(id: string, updates: Partial<DeviceModel>): Promise<DeviceModel | undefined>;
-
-  // Device Variants
-  getVariant(id: string): Promise<DeviceVariant | undefined>;
-  getVariantsByModel(modelId: string): Promise<DeviceVariant[]>;
-  createVariant(variant: InsertDeviceVariant): Promise<DeviceVariant>;
-  updateVariant(id: string, updates: Partial<DeviceVariant>): Promise<DeviceVariant | undefined>;
-
-  // Buyback Condition Profiles
-  getAllConditionProfiles(): Promise<BuybackConditionProfile[]>;
-  getConditionProfile(id: string): Promise<BuybackConditionProfile | undefined>;
-  getConditionProfileByCode(code: string): Promise<BuybackConditionProfile | undefined>;
-  createConditionProfile(profile: InsertBuybackConditionProfile): Promise<BuybackConditionProfile>;
-
-  // Buyback Pricing Rules
-  getPricingRule(id: string): Promise<BuybackPricingRule | undefined>;
-  getPricingRulesByVariant(variantId: string): Promise<BuybackPricingRule[]>;
-  getPricingRuleByVariantAndCondition(variantId: string, conditionId: string): Promise<BuybackPricingRule | undefined>;
-  createPricingRule(rule: InsertBuybackPricingRule): Promise<BuybackPricingRule>;
-  updatePricingRule(id: string, updates: Partial<BuybackPricingRule>): Promise<BuybackPricingRule | undefined>;
-
-  // Quote Requests
-  getQuoteRequest(id: string): Promise<QuoteRequest | undefined>;
-  getQuoteRequestByNumber(quoteNumber: string): Promise<QuoteRequest | undefined>;
-  getQuoteRequestsByUser(userId: string): Promise<QuoteRequest[]>;
-  getQuoteRequestsByEmail(email: string): Promise<QuoteRequest[]>;
-  createQuoteRequest(quote: InsertQuoteRequest): Promise<QuoteRequest>;
-  updateQuoteRequest(id: string, updates: Partial<QuoteRequest>): Promise<QuoteRequest | undefined>;
-
-  // Quote Line Items
-  getQuoteLineItem(id: string): Promise<QuoteLineItem | undefined>;
-  getQuoteLineItemsByQuote(quoteRequestId: string): Promise<QuoteLineItem[]>;
-  createQuoteLineItem(item: InsertQuoteLineItem): Promise<QuoteLineItem>;
-
-  // Sell Orders
-  getSellOrder(id: string): Promise<SellOrder | undefined>;
-  getSellOrderByNumber(orderNumber: string): Promise<SellOrder | undefined>;
-  getSellOrdersByUser(userId: string): Promise<SellOrder[]>;
-  getAllSellOrders(): Promise<SellOrder[]>;
-  createSellOrder(order: InsertSellOrder): Promise<SellOrder>;
-  updateSellOrder(id: string, updates: Partial<SellOrder>): Promise<SellOrder | undefined>;
-
-  // Sell Order Items
-  getSellOrderItem(id: string): Promise<SellOrderItem | undefined>;
-  getSellOrderItemsByOrder(sellOrderId: string): Promise<SellOrderItem[]>;
-  createSellOrderItem(item: InsertSellOrderItem): Promise<SellOrderItem>;
-  updateSellOrderItem(id: string, updates: Partial<SellOrderItem>): Promise<SellOrderItem | undefined>;
+  // Cart methods
+  getCartByUserId(userId: string): Promise<Cart | undefined>;
+  createCart(cart: InsertCart): Promise<Cart>;
+  getCartItems(cartId: string): Promise<CartItem[]>;
+  addCartItem(item: InsertCartItem): Promise<CartItem>;
+  updateCartItem(id: string, updates: Partial<CartItem>): Promise<CartItem | undefined>;
+  removeCartItem(id: string): Promise<void>;
+  clearCart(cartId: string): Promise<void>;
+  
+  // Order methods
+  createOrder(order: InsertOrder): Promise<Order>;
+  getOrder(id: string): Promise<Order | undefined>;
+  getOrderByNumber(orderNumber: string): Promise<Order | undefined>;
+  getOrdersByCompanyId(companyId: string): Promise<Order[]>;
+  getAllOrders(): Promise<Order[]>;
+  updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined>;
+  createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
+  getOrderItems(orderId: string): Promise<OrderItem[]>;
+  
+  // Shipping/Billing Address methods
+  getShippingAddressesByCompanyId(companyId: string): Promise<ShippingAddress[]>;
+  createShippingAddress(address: InsertShippingAddress): Promise<ShippingAddress>;
+  updateShippingAddress(id: string, updates: Partial<ShippingAddress>): Promise<ShippingAddress | undefined>;
+  getBillingAddressesByCompanyId(companyId: string): Promise<BillingAddress[]>;
+  createBillingAddress(address: InsertBillingAddress): Promise<BillingAddress>;
+  
+  // Quote methods
+  createQuote(quote: InsertQuote): Promise<Quote>;
+  getQuote(id: string): Promise<Quote | undefined>;
+  getQuotesByCompanyId(companyId: string): Promise<Quote[]>;
+  updateQuote(id: string, updates: Partial<Quote>): Promise<Quote | undefined>;
+  createQuoteItem(item: InsertQuoteItem): Promise<QuoteItem>;
+  getQuoteItems(quoteId: string): Promise<QuoteItem[]>;
+  
+  // Saved List methods
+  getSavedListsByCompanyId(companyId: string): Promise<SavedList[]>;
+  createSavedList(list: InsertSavedList): Promise<SavedList>;
+  getSavedListItems(listId: string): Promise<SavedListItem[]>;
+  addSavedListItem(item: InsertSavedListItem): Promise<SavedListItem>;
+  
+  // Payment methods
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  getPaymentsByOrderId(orderId: string): Promise<Payment[]>;
+  
+  // Shipment methods
+  createShipment(shipment: InsertShipment): Promise<Shipment>;
+  getShipmentsByOrderId(orderId: string): Promise<Shipment[]>;
+  
+  // FAQ methods
+  getAllFaqs(): Promise<Faq[]>;
+  createFaq(faq: InsertFaq): Promise<Faq>;
+  
+  // Announcement methods
+  getActiveAnnouncements(): Promise<Announcement[]>;
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  
+  // Support Ticket methods
+  createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
+  getSupportTicketsByCompanyId(companyId: string): Promise<SupportTicket[]>;
+  updateSupportTicket(id: string, updates: Partial<SupportTicket>): Promise<SupportTicket | undefined>;
+  
+  // Audit Log methods
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(limit?: number): Promise<AuditLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
-      // Shipments
-      async getShipment(id: string): Promise<any> {
-        const [shipment] = await db.select().from(shipments).where(eq(shipments.id, id));
-        return shipment || undefined;
-      }
-      async getShipmentByOrder(orderId: string): Promise<any> {
-        const [shipment] = await db.select().from(shipments).where(eq(shipments.sellOrderId, orderId));
-        return shipment || undefined;
-      }
-      async createShipment(shipment: any): Promise<any> {
-        const [newShipment] = await db.insert(shipments).values(shipment).returning();
-        return newShipment;
-      }
-      async updateShipment(id: string, updates: Partial<any>): Promise<any> {
-        const [shipment] = await db.update(shipments).set({ ...updates, updatedAt: new Date() }).where(eq(shipments.id, id)).returning();
-        return shipment || undefined;
-      }
-    async deleteModel(id: string): Promise<boolean> {
-      const result = await db.delete(deviceModels).where(eq(deviceModels.id, id));
-      return result.changes > 0;
-    }
-  // Users
+  // User methods
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
     return user || undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email));
     return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    const [user] = await db.insert(schema.users).values(insertUser).returning();
     return user;
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(users.id, id))
-      .returning();
+    const [user] = await db.update(schema.users).set(updates).where(eq(schema.users.id, id)).returning();
     return user || undefined;
   }
 
-  // Device Brands
-  async getAllBrands(): Promise<DeviceBrand[]> {
-    return await db.select().from(deviceBrands).where(eq(deviceBrands.isActive, true));
+  async getAllUsers(): Promise<User[]> {
+    const users = await db.select().from(schema.users);
+    return users;
   }
 
-  async getBrand(id: string): Promise<DeviceBrand | undefined> {
-    const [brand] = await db.select().from(deviceBrands).where(eq(deviceBrands.id, id));
-    return brand || undefined;
+  // Company methods
+  async getCompany(id: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, id));
+    return company || undefined;
   }
 
-  async getBrandBySlug(slug: string): Promise<DeviceBrand | undefined> {
-    const [brand] = await db.select().from(deviceBrands).where(eq(deviceBrands.slug, slug));
-    return brand || undefined;
+  async createCompany(insertCompany: InsertCompany): Promise<Company> {
+    const [company] = await db.insert(schema.companies).values(insertCompany).returning();
+    return company;
   }
 
-  async createBrand(brand: InsertDeviceBrand): Promise<DeviceBrand> {
-    const [newBrand] = await db.insert(deviceBrands).values(brand).returning();
-    return newBrand;
+  async updateCompany(id: string, updates: Partial<Company>): Promise<Company | undefined> {
+    const [company] = await db.update(schema.companies).set(updates).where(eq(schema.companies.id, id)).returning();
+    return company || undefined;
   }
 
-  async updateBrand(id: string, updates: Partial<DeviceBrand>): Promise<DeviceBrand | undefined> {
-    const [brand] = await db
-      .update(deviceBrands)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(deviceBrands.id, id))
-      .returning();
-    return brand || undefined;
+  async getAllCompanies(): Promise<Company[]> {
+    return await db.select().from(schema.companies).orderBy(desc(schema.companies.createdAt));
   }
 
-  // Device Models
-  async getAllModels(): Promise<DeviceModel[]> {
-    return await db.select().from(deviceModels).where(eq(deviceModels.isActive, true));
+  // CompanyUser methods
+  async createCompanyUser(insertCompanyUser: InsertCompanyUser): Promise<CompanyUser> {
+    const [companyUser] = await db.insert(schema.companyUsers).values(insertCompanyUser).returning();
+    return companyUser;
   }
 
-  async getModel(id: string): Promise<DeviceModel | undefined> {
-    const [model] = await db.select().from(deviceModels).where(eq(deviceModels.id, id));
+  async getCompanyUsersByUserId(userId: string): Promise<CompanyUser[]> {
+    return await db.select().from(schema.companyUsers).where(eq(schema.companyUsers.userId, userId));
+  }
+
+  async getCompanyUsersByCompanyId(companyId: string): Promise<CompanyUser[]> {
+    return await db.select().from(schema.companyUsers).where(eq(schema.companyUsers.companyId, companyId));
+  }
+
+  // Device Category methods
+  async getAllCategories(): Promise<DeviceCategory[]> {
+    return await db.select().from(schema.deviceCategories);
+  }
+
+  async getCategory(id: string): Promise<DeviceCategory | undefined> {
+    const [category] = await db.select().from(schema.deviceCategories).where(eq(schema.deviceCategories.id, id));
+    return category || undefined;
+  }
+
+  async getCategoryBySlug(slug: string): Promise<DeviceCategory | undefined> {
+    const [category] = await db.select().from(schema.deviceCategories).where(eq(schema.deviceCategories.slug, slug));
+    return category || undefined;
+  }
+
+  async createCategory(insertCategory: InsertDeviceCategory): Promise<DeviceCategory> {
+    const [category] = await db.insert(schema.deviceCategories).values(insertCategory).returning();
+    return category;
+  }
+
+  // Device Model methods
+  async getAllDeviceModels(): Promise<DeviceModel[]> {
+    return await db.select().from(schema.deviceModels).where(eq(schema.deviceModels.isActive, true));
+  }
+
+  async getDeviceModel(id: string): Promise<DeviceModel | undefined> {
+    const [model] = await db.select().from(schema.deviceModels).where(eq(schema.deviceModels.id, id));
     return model || undefined;
   }
 
-  async getModelBySlug(slug: string): Promise<DeviceModel | undefined> {
-    const [model] = await db.select().from(deviceModels).where(eq(deviceModels.slug, slug));
+  async getDeviceModelBySlug(slug: string): Promise<DeviceModel | undefined> {
+    const [model] = await db.select().from(schema.deviceModels).where(eq(schema.deviceModels.slug, slug));
     return model || undefined;
   }
 
-  async getModelsByBrand(brandId: string): Promise<DeviceModel[]> {
-    return await db
-      .select()
-      .from(deviceModels)
-      .where(and(eq(deviceModels.brandId, brandId), eq(deviceModels.isActive, true)));
+  async createDeviceModel(insertModel: InsertDeviceModel): Promise<DeviceModel> {
+    const [model] = await db.insert(schema.deviceModels).values(insertModel).returning();
+    return model;
   }
 
-  async createModel(model: InsertDeviceModel): Promise<DeviceModel> {
-    const [newModel] = await db.insert(deviceModels).values(model).returning();
-    return newModel;
-  }
-
-  async updateModel(id: string, updates: Partial<DeviceModel>): Promise<DeviceModel | undefined> {
-    const [model] = await db
-      .update(deviceModels)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(deviceModels.id, id))
-      .returning();
-    return model || undefined;
-  }
-
-  // Device Variants
-  async getVariant(id: string): Promise<DeviceVariant | undefined> {
-    const [variant] = await db.select().from(deviceVariants).where(eq(deviceVariants.id, id));
+  // Device Variant methods
+  async getDeviceVariant(id: string): Promise<DeviceVariant | undefined> {
+    const [variant] = await db.select().from(schema.deviceVariants).where(eq(schema.deviceVariants.id, id));
     return variant || undefined;
   }
 
-  async getVariantsByModel(modelId: string): Promise<DeviceVariant[]> {
-    return await db
-      .select()
-      .from(deviceVariants)
-      .where(and(eq(deviceVariants.modelId, modelId), eq(deviceVariants.isActive, true)));
+  async getDeviceVariantsByModelId(modelId: string): Promise<DeviceVariant[]> {
+    return await db.select().from(schema.deviceVariants).where(eq(schema.deviceVariants.deviceModelId, modelId));
   }
 
-  async createVariant(variant: InsertDeviceVariant): Promise<DeviceVariant> {
-    const [newVariant] = await db.insert(deviceVariants).values(variant).returning();
-    return newVariant;
+  async createDeviceVariant(insertVariant: InsertDeviceVariant): Promise<DeviceVariant> {
+    const [variant] = await db.insert(schema.deviceVariants).values(insertVariant).returning();
+    return variant;
   }
 
-  async updateVariant(id: string, updates: Partial<DeviceVariant>): Promise<DeviceVariant | undefined> {
-    const [variant] = await db
-      .update(deviceVariants)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(deviceVariants.id, id))
-      .returning();
+  async updateDeviceVariant(id: string, updates: Partial<DeviceVariant>): Promise<DeviceVariant | undefined> {
+    const [variant] = await db.update(schema.deviceVariants).set(updates).where(eq(schema.deviceVariants.id, id)).returning();
     return variant || undefined;
   }
 
-  // Buyback Condition Profiles
-  async getAllConditionProfiles(): Promise<BuybackConditionProfile[]> {
-    return await db.select().from(buybackConditionProfiles).where(eq(buybackConditionProfiles.isActive, true));
+  async deleteDeviceVariant(id: string): Promise<void> {
+    await db.delete(schema.deviceVariants).where(eq(schema.deviceVariants.id, id));
   }
 
-  async getConditionProfile(id: string): Promise<BuybackConditionProfile | undefined> {
-    const [profile] = await db.select().from(buybackConditionProfiles).where(eq(buybackConditionProfiles.id, id));
-    return profile || undefined;
+  // Inventory methods
+  async getInventoryByVariantId(variantId: string): Promise<InventoryItem | undefined> {
+    const [item] = await db.select().from(schema.inventoryItems).where(eq(schema.inventoryItems.deviceVariantId, variantId));
+    return item || undefined;
   }
 
-  async getConditionProfileByCode(code: string): Promise<BuybackConditionProfile | undefined> {
-    const [profile] = await db.select().from(buybackConditionProfiles).where(eq(buybackConditionProfiles.code, code));
-    return profile || undefined;
+  async createInventory(insertInventory: InsertInventoryItem): Promise<InventoryItem> {
+    const [item] = await db.insert(schema.inventoryItems).values(insertInventory).returning();
+    return item;
   }
 
-  async createConditionProfile(profile: InsertBuybackConditionProfile): Promise<BuybackConditionProfile> {
-    const [newProfile] = await db.insert(buybackConditionProfiles).values(profile).returning();
-    return newProfile;
+  async updateInventory(id: string, updates: Partial<InventoryItem>): Promise<InventoryItem | undefined> {
+    const [item] = await db.update(schema.inventoryItems).set(updates).where(eq(schema.inventoryItems.id, id)).returning();
+    return item || undefined;
   }
 
-  // Buyback Pricing Rules
-  async getPricingRule(id: string): Promise<BuybackPricingRule | undefined> {
-    const [rule] = await db.select().from(buybackPricingRules).where(eq(buybackPricingRules.id, id));
-    return rule || undefined;
+  async deleteInventoryByVariantId(variantId: string): Promise<void> {
+    await db.delete(schema.inventoryItems).where(eq(schema.inventoryItems.deviceVariantId, variantId));
   }
 
-  async getPricingRulesByVariant(variantId: string): Promise<BuybackPricingRule[]> {
+  // Price Tier methods
+  async getPriceTiersByVariantId(variantId: string): Promise<PriceTier[]> {
+    return await db.select().from(schema.priceTiers)
+      .where(and(
+        eq(schema.priceTiers.deviceVariantId, variantId),
+        eq(schema.priceTiers.isActive, true)
+      ))
+      .orderBy(schema.priceTiers.minQuantity);
+  }
+
+  async createPriceTier(insertTier: InsertPriceTier): Promise<PriceTier> {
+    const [tier] = await db.insert(schema.priceTiers).values(insertTier).returning();
+    return tier;
+  }
+
+  async updatePriceTier(id: string, updates: Partial<PriceTier>): Promise<PriceTier | undefined> {
+    const [tier] = await db.update(schema.priceTiers).set(updates).where(eq(schema.priceTiers.id, id)).returning();
+    return tier || undefined;
+  }
+
+  async deletePriceTiersByVariantId(variantId: string): Promise<void> {
+    await db.delete(schema.priceTiers).where(eq(schema.priceTiers.deviceVariantId, variantId));
+  }
+
+  // Cart methods
+  async getCartByUserId(userId: string): Promise<Cart | undefined> {
+    const [cart] = await db.select().from(schema.carts).where(eq(schema.carts.userId, userId));
+    return cart || undefined;
+  }
+
+  async createCart(insertCart: InsertCart): Promise<Cart> {
+    const [cart] = await db.insert(schema.carts).values(insertCart).returning();
+    return cart;
+  }
+
+  async getCartItems(cartId: string): Promise<CartItem[]> {
+    return await db.select().from(schema.cartItems).where(eq(schema.cartItems.cartId, cartId));
+  }
+
+  async addCartItem(insertItem: InsertCartItem): Promise<CartItem> {
+    const [item] = await db.insert(schema.cartItems).values(insertItem).returning();
+    return item;
+  }
+
+  async updateCartItem(id: string, updates: Partial<CartItem>): Promise<CartItem | undefined> {
+    const [item] = await db.update(schema.cartItems).set(updates).where(eq(schema.cartItems.id, id)).returning();
+    return item || undefined;
+  }
+
+  async removeCartItem(id: string): Promise<void> {
+    await db.delete(schema.cartItems).where(eq(schema.cartItems.id, id));
+  }
+
+  async clearCart(cartId: string): Promise<void> {
+    await db.delete(schema.cartItems).where(eq(schema.cartItems.cartId, cartId));
+  }
+
+  // Order methods
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    const [order] = await db.insert(schema.orders).values(insertOrder).returning();
+    return order;
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
+    return order || undefined;
+  }
+
+  async getOrderByNumber(orderNumber: string): Promise<Order | undefined> {
+    const [order] = await db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber));
+    return order || undefined;
+  }
+
+  async getOrdersByCompanyId(companyId: string): Promise<Order[]> {
+    return await db.select().from(schema.orders)
+      .where(eq(schema.orders.companyId, companyId))
+      .orderBy(desc(schema.orders.createdAt));
+  }
+
+  async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
+    const [order] = await db.update(schema.orders).set(updates).where(eq(schema.orders.id, id)).returning();
+    return order || undefined;
+  }
+
+  async getAllOrders(): Promise<Order[]> {
+    const orders = await db.select().from(schema.orders);
+    return orders;
+  }
+
+  async createOrderItem(insertItem: InsertOrderItem): Promise<OrderItem> {
+    const [item] = await db.insert(schema.orderItems).values(insertItem).returning();
+    return item;
+  }
+
+  async getOrderItems(orderId: string): Promise<OrderItem[]> {
+    return await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+  }
+
+  // Shipping/Billing Address methods
+  async getShippingAddressesByCompanyId(companyId: string): Promise<ShippingAddress[]> {
+    return await db.select().from(schema.shippingAddresses).where(eq(schema.shippingAddresses.companyId, companyId));
+  }
+
+  async createShippingAddress(insertAddress: InsertShippingAddress): Promise<ShippingAddress> {
+    const [address] = await db.insert(schema.shippingAddresses).values(insertAddress).returning();
+    return address;
+  }
+
+  async updateShippingAddress(id: string, updates: Partial<ShippingAddress>): Promise<ShippingAddress | undefined> {
+    const [address] = await db.update(schema.shippingAddresses).set(updates).where(eq(schema.shippingAddresses.id, id)).returning();
+    return address || undefined;
+  }
+
+  async getBillingAddressesByCompanyId(companyId: string): Promise<BillingAddress[]> {
+    return await db.select().from(schema.billingAddresses).where(eq(schema.billingAddresses.companyId, companyId));
+  }
+
+  async createBillingAddress(insertAddress: InsertBillingAddress): Promise<BillingAddress> {
+    const [address] = await db.insert(schema.billingAddresses).values(insertAddress).returning();
+    return address;
+  }
+
+  // Quote methods
+  async createQuote(insertQuote: InsertQuote): Promise<Quote> {
+    const [quote] = await db.insert(schema.quotes).values(insertQuote).returning();
+    return quote;
+  }
+
+  async getQuote(id: string): Promise<Quote | undefined> {
+    const [quote] = await db.select().from(schema.quotes).where(eq(schema.quotes.id, id));
+    return quote || undefined;
+  }
+
+  async getQuotesByCompanyId(companyId: string): Promise<Quote[]> {
+    return await db.select().from(schema.quotes)
+      .where(eq(schema.quotes.companyId, companyId))
+      .orderBy(desc(schema.quotes.createdAt));
+  }
+
+  async updateQuote(id: string, updates: Partial<Quote>): Promise<Quote | undefined> {
+    const [quote] = await db.update(schema.quotes).set(updates).where(eq(schema.quotes.id, id)).returning();
+    return quote || undefined;
+  }
+
+  async createQuoteItem(insertItem: InsertQuoteItem): Promise<QuoteItem> {
+    const [item] = await db.insert(schema.quoteItems).values(insertItem).returning();
+    return item;
+  }
+
+  async getQuoteItems(quoteId: string): Promise<QuoteItem[]> {
+    return await db.select().from(schema.quoteItems).where(eq(schema.quoteItems.quoteId, quoteId));
+  }
+
+  // Saved List methods
+  async getSavedListsByCompanyId(companyId: string): Promise<SavedList[]> {
+    return await db.select().from(schema.savedLists).where(eq(schema.savedLists.companyId, companyId));
+  }
+
+  async createSavedList(insertList: InsertSavedList): Promise<SavedList> {
+    const [list] = await db.insert(schema.savedLists).values(insertList).returning();
+    return list;
+  }
+
+  async getSavedListItems(listId: string): Promise<SavedListItem[]> {
+    return await db.select().from(schema.savedListItems).where(eq(schema.savedListItems.savedListId, listId));
+  }
+
+  async addSavedListItem(insertItem: InsertSavedListItem): Promise<SavedListItem> {
+    const [item] = await db.insert(schema.savedListItems).values(insertItem).returning();
+    return item;
+  }
+
+  async getSavedList(id: string): Promise<SavedList | undefined> {
+    const [list] = await db.select().from(schema.savedLists).where(eq(schema.savedLists.id, id));
+    return list || undefined;
+  }
+
+  async deleteSavedList(id: string): Promise<void> {
+    await db.delete(schema.savedLists).where(eq(schema.savedLists.id, id));
+  }
+
+  async deleteSavedListItem(id: string): Promise<void> {
+    await db.delete(schema.savedListItems).where(eq(schema.savedListItems.id, id));
+  }
+
+  // Payment methods
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const [payment] = await db.insert(schema.payments).values(insertPayment).returning();
+    return payment;
+  }
+
+  async getPaymentsByOrderId(orderId: string): Promise<Payment[]> {
+    return await db.select().from(schema.payments).where(eq(schema.payments.orderId, orderId));
+  }
+
+  // Shipment methods
+  async createShipment(insertShipment: InsertShipment): Promise<Shipment> {
+    const [shipment] = await db.insert(schema.shipments).values(insertShipment).returning();
+    return shipment;
+  }
+
+  async getShipmentsByOrderId(orderId: string): Promise<Shipment[]> {
+    return await db.select().from(schema.shipments).where(eq(schema.shipments.orderId, orderId));
+  }
+
+  // FAQ methods
+  async getAllFaqs(): Promise<Faq[]> {
+    return await db.select().from(schema.faqs)
+      .where(eq(schema.faqs.isActive, true))
+      .orderBy(schema.faqs.category, schema.faqs.displayOrder);
+  }
+
+  async createFaq(insertFaq: InsertFaq): Promise<Faq> {
+    const [faq] = await db.insert(schema.faqs).values(insertFaq).returning();
+    return faq;
+  }
+
+  // Announcement methods
+  async getActiveAnnouncements(): Promise<Announcement[]> {
     const now = new Date();
-    return await db
-      .select()
-      .from(buybackPricingRules)
+    return await db.select().from(schema.announcements)
       .where(
         and(
-          eq(buybackPricingRules.deviceVariantId, variantId),
-          eq(buybackPricingRules.isActive, true),
-          lte(buybackPricingRules.effectiveFrom, now),
-          and(
-            isNull(buybackPricingRules.effectiveTo),
-            gte(buybackPricingRules.effectiveTo, now)
-          )
+          eq(schema.announcements.isActive, true),
+          sql`${schema.announcements.startsAt} <= ${now}`,
+          sql`(${schema.announcements.endsAt} IS NULL OR ${schema.announcements.endsAt} >= ${now})`
         )
       );
   }
 
-  async getPricingRuleByVariantAndCondition(
-    variantId: string,
-    conditionId: string
-  ): Promise<BuybackPricingRule | undefined> {
-    const now = new Date();
-    const [rule] = await db
-      .select()
-      .from(buybackPricingRules)
-      .where(
-        and(
-          eq(buybackPricingRules.deviceVariantId, variantId),
-          eq(buybackPricingRules.conditionProfileId, conditionId),
-          eq(buybackPricingRules.isActive, true),
-          lte(buybackPricingRules.effectiveFrom, now),
-          or(
-            isNull(buybackPricingRules.effectiveTo),
-            gte(buybackPricingRules.effectiveTo, now)
-          )
-        )
-      );
-    return rule || undefined;
+  async createAnnouncement(insertAnnouncement: InsertAnnouncement): Promise<Announcement> {
+    const [announcement] = await db.insert(schema.announcements).values(insertAnnouncement).returning();
+    return announcement;
   }
 
-  async createPricingRule(rule: InsertBuybackPricingRule): Promise<BuybackPricingRule> {
-    const [newRule] = await db.insert(buybackPricingRules).values(rule).returning();
-    return newRule;
+  // Support Ticket methods
+  async createSupportTicket(insertTicket: InsertSupportTicket): Promise<SupportTicket> {
+    const [ticket] = await db.insert(schema.supportTickets).values(insertTicket).returning();
+    return ticket;
   }
 
-  async updatePricingRule(id: string, updates: Partial<BuybackPricingRule>): Promise<BuybackPricingRule | undefined> {
-    const [rule] = await db
-      .update(buybackPricingRules)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(buybackPricingRules.id, id))
-      .returning();
-    return rule || undefined;
+  async getSupportTicketsByCompanyId(companyId: string): Promise<SupportTicket[]> {
+    return await db.select().from(schema.supportTickets)
+      .where(eq(schema.supportTickets.companyId, companyId))
+      .orderBy(desc(schema.supportTickets.createdAt));
   }
 
-  // Quote Requests
-  async getQuoteRequest(id: string): Promise<QuoteRequest | undefined> {
-    const [quote] = await db.select().from(quoteRequests).where(eq(quoteRequests.id, id));
-    return quote || undefined;
+  async updateSupportTicket(id: string, updates: Partial<SupportTicket>): Promise<SupportTicket | undefined> {
+    const [ticket] = await db.update(schema.supportTickets).set(updates).where(eq(schema.supportTickets.id, id)).returning();
+    return ticket || undefined;
   }
 
-  async getQuoteRequestByNumber(quoteNumber: string): Promise<QuoteRequest | undefined> {
-    const [quote] = await db.select().from(quoteRequests).where(eq(quoteRequests.quoteNumber, quoteNumber));
-    return quote || undefined;
+  // Audit Log methods
+  async createAuditLog(insertLog: InsertAuditLog): Promise<AuditLog> {
+    const [log] = await db.insert(schema.auditLogs).values(insertLog).returning();
+    return log;
   }
 
-  async getQuoteRequestsByUser(userId: string): Promise<QuoteRequest[]> {
-    return await db.select().from(quoteRequests).where(eq(quoteRequests.userId, userId));
-  }
-
-  async getQuoteRequestsByEmail(email: string): Promise<QuoteRequest[]> {
-    return await db.select().from(quoteRequests).where(eq(quoteRequests.email, email));
-  }
-
-  async createQuoteRequest(quote: InsertQuoteRequest): Promise<QuoteRequest> {
-    const [newQuote] = await db.insert(quoteRequests).values(quote).returning();
-    return newQuote;
-  }
-
-  async updateQuoteRequest(id: string, updates: Partial<QuoteRequest>): Promise<QuoteRequest | undefined> {
-    const [quote] = await db
-      .update(quoteRequests)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(quoteRequests.id, id))
-      .returning();
-    return quote || undefined;
-  }
-
-  // Quote Line Items
-  async getQuoteLineItem(id: string): Promise<QuoteLineItem | undefined> {
-    const [item] = await db.select().from(quoteLineItems).where(eq(quoteLineItems.id, id));
-    return item || undefined;
-  }
-
-  async getQuoteLineItemsByQuote(quoteRequestId: string): Promise<QuoteLineItem[]> {
-    return await db.select().from(quoteLineItems).where(eq(quoteLineItems.quoteRequestId, quoteRequestId));
-  }
-
-  async createQuoteLineItem(item: InsertQuoteLineItem): Promise<QuoteLineItem> {
-    const [newItem] = await db.insert(quoteLineItems).values(item).returning();
-    return newItem;
-  }
-
-  // Sell Orders
-  async getSellOrder(id: string): Promise<SellOrder | undefined> {
-    const [order] = await db.select().from(sellOrders).where(eq(sellOrders.id, id));
-    return order || undefined;
-  }
-
-  async getSellOrderByNumber(orderNumber: string): Promise<SellOrder | undefined> {
-    const [order] = await db.select().from(sellOrders).where(eq(sellOrders.orderNumber, orderNumber));
-    return order || undefined;
-  }
-
-  async getSellOrdersByUser(userId: string): Promise<SellOrder[]> {
-    return await db.select().from(sellOrders).where(eq(sellOrders.userId, userId));
-  }
-
-  async getAllSellOrders(): Promise<SellOrder[]> {
-    return await db.select().from(sellOrders);
-  }
-
-  async createSellOrder(order: InsertSellOrder): Promise<SellOrder> {
-    const [newOrder] = await db.insert(sellOrders).values(order).returning();
-    return newOrder;
-  }
-
-  async updateSellOrder(id: string, updates: Partial<SellOrder>): Promise<SellOrder | undefined> {
-    const [order] = await db
-      .update(sellOrders)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(sellOrders.id, id))
-      .returning();
-    return order || undefined;
-  }
-
-  // Sell Order Items
-  async getSellOrderItem(id: string): Promise<SellOrderItem | undefined> {
-    const [item] = await db.select().from(sellOrderItems).where(eq(sellOrderItems.id, id));
-    return item || undefined;
-  }
-
-  async getSellOrderItemsByOrder(sellOrderId: string): Promise<SellOrderItem[]> {
-    return await db.select().from(sellOrderItems).where(eq(sellOrderItems.sellOrderId, sellOrderId));
-  }
-
-  async createSellOrderItem(item: InsertSellOrderItem): Promise<SellOrderItem> {
-    const [newItem] = await db.insert(sellOrderItems).values(item).returning();
-    return newItem;
-  }
-
-  async updateSellOrderItem(id: string, updates: Partial<SellOrderItem>): Promise<SellOrderItem | undefined> {
-    const [item] = await db
-      .update(sellOrderItems)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(sellOrderItems.id, id))
-      .returning();
-    return item || undefined;
+  async getAuditLogs(limit: number = 100): Promise<AuditLog[]> {
+    return await db.select().from(schema.auditLogs)
+      .orderBy(desc(schema.auditLogs.createdAt))
+      .limit(limit);
   }
 }
 
