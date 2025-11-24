@@ -8,7 +8,7 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "build:client": "vite build",
     "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "build:api": "esbuild server-api-only.js --platform=node --packages=external --bundle --format=esm --outfile=dist/api-server.js && npm run db:push && npm run seed:production",
+    "build:api": "esbuild server-api-only.js --platform=node --packages=external --bundle --format=esm --outfile=dist/api-server.js",
     "start": "NODE_ENV=production node dist/index.js",
     "start:server": "NODE_ENV=production API_ONLY=true PORT=8032 node dist/index.js",
     "start:api": "NODE_ENV=production node dist/api-server.js",
