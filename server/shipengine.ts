@@ -128,8 +128,8 @@ export async function createShippingLabel(
     return {
       labelId: data.label_id,
       trackingNumber: data.tracking_number,
-      labelUrl: data.label_download?.pdf || data.label_download_url || data.label_url,
-      labelPdfUrl: data.label_download?.pdf || data.label_url,
+      labelUrl: data.label_download?.href || data.label_download_url || data.label_url,
+      labelPdfUrl: data.label_download?.href || data.label_url,
       labelDownload: data.label_download,
       cost: data.shipment_cost?.amount || 0,
       carrier: data.carrier_id || carrier,

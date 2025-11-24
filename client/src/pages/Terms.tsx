@@ -6,12 +6,22 @@ export default function Terms() {
     <div className="min-h-screen flex flex-col">
       <PublicHeader />
       
-      <main className="flex-1">
-        <section className="py-16">
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
-            <div className="max-w-4xl mx-auto prose prose-slate dark:prose-invert">
+      <main className="flex-1 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <section className="py-16 relative overflow-hidden">
+          {/* Dark luxury background */}
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
+            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px]"></div>
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px]"></div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+          </div>
+          
+          <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
+            <div className="max-w-4xl mx-auto">
+              <div className="backdrop-blur-md bg-card/50 border border-border/50 rounded-xl p-8 md:p-12 hover:shadow-2xl transition-all duration-500">
+                <div className="prose prose-slate max-w-none dark:prose-invert">
               <h1>Terms of Service</h1>
-              <p className="text-muted-foreground"><em>Last updated: {new Date().toLocaleDateString()}</em></p>
+              <p><em>Last updated: {new Date().toLocaleDateString()}</em></p>
 
               <h2>1. Acceptance of Terms</h2>
               <p>
@@ -150,6 +160,8 @@ export default function Terms() {
                 <strong>Email:</strong> legal@secondhandcell.com<br />
                 <strong>Support:</strong> support@secondhandcell.com
               </p>
+                </div>
+              </div>
             </div>
           </div>
         </section>

@@ -1295,16 +1295,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const order = await storage.getSellOrder(orderId);
       if (!order) return res.status(404).json({ error: "Order not found" });
       
+      console.log("[Label Gen] Order data:", {
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        shippingAddressLine1: order.shippingAddressLine1,
+        shippingCity: order.shippingCity,
+        shippingState: order.shippingState,
+        shippingPostalCode: order.shippingPostalCode,
+      });
+      
+      // Use provided data or fall back to order data
+      const customerEmail = email || order.customerEmail;
+      const customerPhone = phone || order.customerPhone;
+      const customerName = name || customerEmail?.split('@')[0] || 'Customer';
+      const shippingAddress = address || order.shippingAddressLine1;
+      const shippingCity = city || order.shippingCity;
+      const shippingState = state || order.shippingState;
+      const shippingZip = zipCode || order.shippingPostalCode;
+
+      if (!customerEmail || !shippingAddress || !shippingCity || !shippingState || !shippingZip) {
+        console.log("[Label Gen] Missing fields:", {
+          customerEmail: !!customerEmail,
+          shippingAddress: !!shippingAddress,
+          shippingCity: !!shippingCity,
+          shippingState: !!shippingState,
+          shippingZip: !!shippingZip,
+        });
+        return res.status(400).json({ 
+          error: "Missing shipping information",
+          details: "Order must have complete shipping address to generate label"
+        });
+      }
+      
       // Build shipping address
       const toAddress: any = {
-        name: name || email.split('@')[0],
-        address_line1: address,
-        city_locality: city,
-        state_province: stateNameToAbbr(state),
-        postal_code: zipCode,
+        name: customerName,
+        address_line1: shippingAddress,
+        city_locality: shippingCity,
+        state_province: stateNameToAbbr(shippingState),
+        postal_code: shippingZip,
         country_code: 'US',
-        phone: phone || '',
-        email: email,
+        phone: customerPhone || '',
+        email: customerEmail,
       };
       
       console.log("[Label Gen] Calling ShipEngine with address:", toAddress.city_locality, toAddress.state_province);

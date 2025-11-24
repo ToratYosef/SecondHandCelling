@@ -153,8 +153,6 @@ export function InstantQuoteWidget() {
 
   return (
     <Card className="p-6 md:p-8">
-      <h2 className="text-2xl font-bold mb-6">Get Your Instant Quote</h2>
-      
       {step === 'brand' && (
         <div className="space-y-4">
           <Label className="text-base">Select Brand</Label>

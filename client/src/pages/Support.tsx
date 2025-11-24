@@ -20,21 +20,29 @@ export default function Support() {
     <div className="min-h-screen flex flex-col">
       <PublicHeader />
       
-      <main className="flex-1">
-        <section className="py-16 bg-gradient-to-b from-primary/5 to-background">
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <main className="flex-1 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <section className="py-16 relative overflow-hidden">
+          {/* Dark luxury background */}
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
+            <div className="absolute top-10 left-10 w-72 h-72 bg-blue-500/10 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+          </div>
+          
+          <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
+              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 text-white animate-in fade-in duration-700">
                 Contact Support
               </h1>
-              <p className="text-xl text-muted-foreground">
+              <p className="text-xl text-white/60">
                 Have a question? We're here to help. Reach out and we'll get back to you as soon as possible.
               </p>
             </div>
           </div>
         </section>
 
-        <section className="py-16">
+        <section className="py-16 bg-background">
           <div className="max-w-7xl mx-auto px-4 md:px-6">
             <div className="grid md:grid-cols-2 gap-12 max-w-5xl mx-auto">
               {/* Contact Info */}
@@ -46,9 +54,9 @@ export default function Support() {
                   </p>
                 </div>
 
-                <Card className="p-6">
+                <Card className="p-6 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-xl hover:border-primary/30 hover:-translate-y-1 transition-all duration-300">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-600/20 dark:to-cyan-600/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                       <Mail className="w-6 h-6 text-primary" />
                     </div>
                     <div>
@@ -63,9 +71,9 @@ export default function Support() {
                   </div>
                 </Card>
 
-                <Card className="p-6">
+                <Card className="p-6 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-xl hover:border-primary/30 hover:-translate-y-1 transition-all duration-300">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-600/20 dark:to-cyan-600/20 flex items-center justify-center shrink-0">
                       <Clock className="w-6 h-6 text-primary" />
                     </div>
                     <div>
@@ -77,9 +85,9 @@ export default function Support() {
                   </div>
                 </Card>
 
-                <Card className="p-6">
+                <Card className="p-6 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-xl hover:border-primary/30 hover:-translate-y-1 transition-all duration-300">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-600/20 dark:to-cyan-600/20 flex items-center justify-center shrink-0">
                       <HelpCircle className="w-6 h-6 text-primary" />
                     </div>
                     <div>
@@ -98,8 +106,8 @@ export default function Support() {
               {/* Contact Form */}
               <div>
                 {submitted ? (
-                  <Card className="p-8 text-center bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-                    <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center mx-auto mb-4">
+                  <Card className="p-8 text-center backdrop-blur-md bg-green-50 dark:bg-green-950/20 border-green-500">
+                    <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-500/20 flex items-center justify-center mx-auto mb-4">
                       <Mail className="w-8 h-8 text-green-600" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">Message Sent!</h3>
@@ -111,7 +119,7 @@ export default function Support() {
                     </Button>
                   </Card>
                 ) : (
-                  <Card className="p-8">
+                  <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50">
                     <h2 className="text-2xl font-bold mb-6">Send Us a Message</h2>
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <div>
@@ -165,7 +173,7 @@ export default function Support() {
                         />
                       </div>
 
-                      <Button type="submit" className="w-full" data-testid="button-submit-support">
+                      <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700" data-testid="button-submit-support">
                         Send Message
                       </Button>
                     </form>

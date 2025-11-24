@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AlertCircle, Check, Smartphone } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 
@@ -97,6 +97,52 @@ export default function Sell() {
   const storageOptions = ["64GB", "128GB", "256GB", "512GB", "1TB"];
   const carrierOptions = ["AT&T", "Verizon", "T-Mobile", "Unlocked"];
 
+  // Parse URL parameters and pre-fill form
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const deviceSlug = params.get('device');
+    const storageParam = params.get('storage');
+    const carrierParam = params.get('carrier');
+    const powerParam = params.get('power');
+    const functionalityParam = params.get('functionality');
+    const qualityParam = params.get('quality');
+
+    // Pre-fill storage
+    if (storageParam && storageOptions.includes(storageParam)) {
+      setStorage(storageParam);
+    }
+
+    // Pre-fill carrier
+    if (carrierParam && carrierOptions.includes(carrierParam)) {
+      setCarrier(carrierParam);
+    }
+
+    // Pre-fill activation lock (power)
+    if (powerParam === 'on' || powerParam === 'off') {
+      setHasActivationLock(powerParam === 'on' ? 'yes' : 'no');
+    }
+
+    // Pre-fill functionality
+    if (functionalityParam === 'working' || functionalityParam === 'broken') {
+      setIsFullyFunctional(functionalityParam === 'working' ? 'yes' : 'no');
+    }
+
+    // Pre-fill quality (cracks)
+    if (qualityParam === 'pristine' || qualityParam === 'damaged') {
+      setHasCracks(qualityParam === 'pristine' ? 'no' : 'yes');
+    }
+
+    // Find and select device by slug
+    if (deviceSlug && models.length > 0) {
+      const model = models.find((m: DeviceModel) => m.slug === deviceSlug);
+      if (model) {
+        setSelectedModel(model.id);
+        setSelectedBrand(model.brandId);
+        setStep('questions');
+      }
+    }
+  }, [models]);
+
   const handleBrandSelect = (brandId: string) => {
     setSelectedBrand(brandId);
     setStep('model');
@@ -163,11 +209,18 @@ export default function Sell() {
     }
     // Build order payload for backend schema
     const orderPayload = {
+      customerEmail: shippingEmail,
+      customerPhone: phone,
+      shippingAddressLine1: address,
+      shippingCity: city,
+      shippingState: state,
+      shippingPostalCode: zipCode,
+      shippingCountry: "US",
       payoutMethod: paymentMethod,
       payoutDetailsJson: JSON.stringify({ username: paymentUsername }),
       totalOriginalOffer: calculatedOffer,
       currency: "USD",
-      notesCustomer: `Shipping: ${shippingOption}, Address: ${address}, ${city}, ${state}, ${zipCode}, Phone: ${phone}, Email: ${shippingEmail}`,
+      notesCustomer: `Shipping: ${shippingOption}`,
     };
     fetch("/api/orders", {
       method: "POST",
@@ -199,9 +252,18 @@ export default function Sell() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(itemPayload),
         });
+
+        // Generate shipping label if they chose email label
+        if (shippingOption === "label") {
+          await fetch(`/api/orders/${order.id}/generate-label`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
         setShowPaymentDialog(false);
-        setStep('confirmed');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Redirect to success page
+        setLocation(`/success?order=${order.orderNumber}`);
       })
       .catch((err) => {
         console.error("Order submission failed:", err);
@@ -216,10 +278,16 @@ export default function Sell() {
     <div className="min-h-screen flex flex-col">
       <PublicHeader />
       
-      <main className="flex-1 py-12">
-        <div className="max-w-4xl mx-auto px-4 md:px-6">
+      <main className="flex-1 py-12 relative overflow-hidden">
+        {/* Background decorative elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-20 right-20 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        </div>
+        
+        <div className="max-w-4xl mx-auto px-4 md:px-6 relative z-10">
           <div className="mb-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Get an Instant Offer</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent animate-in fade-in duration-700">Get an Instant Offer</h1>
             <p className="text-lg text-muted-foreground">
               Answer a few questions to get your quote in seconds
             </p>
@@ -227,17 +295,17 @@ export default function Sell() {
 
           {/* Step 1: Select Brand */}
           {step === 'brand' && (
-            <Card className="p-8">
-              <h2 className="text-2xl font-semibold mb-6">Select Your Device Brand</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-2xl transition-all duration-500">
+              <h2 className="text-2xl font-semibold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Select Your Device Brand</h2>
+              <div className={`grid gap-4 ${brands.length === 1 ? 'grid-cols-1 max-w-md mx-auto' : brands.length === 2 ? 'grid-cols-2' : brands.length === 3 ? 'grid-cols-3' : 'grid-cols-2 md:grid-cols-4'}`}>
                 {brands.map((brand) => (
                   <button
                     key={brand.id}
                     onClick={() => handleBrandSelect(brand.id)}
-                    className="p-6 border-2 rounded-lg hover-elevate active-elevate-2 text-center transition-all"
+                    className="backdrop-blur-md bg-card/50 border-2 border-border/50 rounded-lg hover:border-primary hover:bg-primary/5 hover:shadow-lg hover:-translate-y-1 active:scale-95 p-6 text-center transition-all duration-300 group"
                     data-testid={`button-brand-${brand.slug}`}
                   >
-                    <Smartphone className="w-12 h-12 mx-auto mb-3 text-primary" />
+                    <Smartphone className="w-12 h-12 mx-auto mb-3 text-primary group-hover:scale-110 transition-transform duration-300" />
                     <p className="font-semibold">{brand.name}</p>
                   </button>
                 ))}
@@ -247,19 +315,19 @@ export default function Sell() {
 
           {/* Step 2: Select Model */}
           {step === 'model' && (
-            <Card className="p-8">
+            <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-2xl transition-all duration-500">
               <Button
                 variant="ghost"
                 onClick={() => {
                   setStep('brand');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="mb-4"
+                className="mb-4 hover:bg-primary/10 transition-colors"
                 data-testid="button-back"
               >
                 ← Back to Brands
               </Button>
-              <h2 className="text-2xl font-semibold mb-6">
+              <h2 className="text-2xl font-semibold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                 Select Your {selectedBrandData?.name} Model
               </h2>
               <div className="grid md:grid-cols-2 gap-4">
@@ -267,7 +335,7 @@ export default function Sell() {
                   <button
                     key={model.id}
                     onClick={() => handleModelSelect(model.id)}
-                    className="p-6 border-2 rounded-lg hover-elevate active-elevate-2 text-left transition-all"
+                    className="p-6 backdrop-blur-md bg-card/50 border-2 border-border/50 rounded-lg hover:border-primary hover:bg-primary/5 hover:shadow-lg hover:-translate-y-1 active:scale-95 text-left transition-all duration-300"
                     data-testid={`button-model-${model.slug}`}
                   >
                     <p className="font-semibold text-lg">{model.name}</p>

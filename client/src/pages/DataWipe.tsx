@@ -9,26 +9,36 @@ export default function DataWipe() {
     <div className="min-h-screen flex flex-col">
       <PublicHeader />
       
-      <main className="flex-1">
-        <section className="py-16 bg-gradient-to-b from-primary/5 to-background">
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <main className="flex-1 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <section className="py-16 relative overflow-hidden">
+          {/* Dark luxury background */}
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
+            <div className="absolute top-10 left-10 w-72 h-72 bg-blue-500/10 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+          </div>
+          
+          <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
-              <ShieldCheck className="w-16 h-16 text-primary mx-auto mb-6" />
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
+              <div className="inline-block p-4 bg-blue-500/10 backdrop-blur-md rounded-full mb-6">
+                <ShieldCheck className="w-16 h-16 text-blue-400 animate-pulse" />
+              </div>
+              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 text-white animate-in fade-in duration-700">
                 Data Wipe Guide
               </h1>
-              <p className="text-xl text-muted-foreground">
+              <p className="text-xl text-white/60">
                 Protect your privacy by properly erasing all personal data before shipping your device
               </p>
             </div>
           </div>
         </section>
 
-        <section className="py-16">
+        <section className="py-16 bg-background">
           <div className="max-w-7xl mx-auto px-4 md:px-6">
             <div className="max-w-4xl mx-auto">
-              <Alert className="mb-12 border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <Alert className="mb-12 bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-500 rounded-lg hover:border-amber-600 transition-all duration-300 hover:shadow-lg">
+                <AlertTriangle className="h-5 w-5 text-amber-600 animate-pulse" />
                 <AlertDescription className="text-sm ml-2">
                   <strong>Important:</strong> Failure to properly wipe your device and disable activation locks will delay your payout. Devices with active locks will be returned to you at no charge.
                 </AlertDescription>
@@ -36,7 +46,7 @@ export default function DataWipe() {
 
               <div className="space-y-12">
                 {/* iPhone/iPad */}
-                <Card className="p-8">
+                <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-2xl hover:border-primary/30 transition-all duration-500 hover:-translate-y-1">
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                     <span className="text-4xl">🍎</span>
                     iPhone & iPad
@@ -118,7 +128,7 @@ export default function DataWipe() {
                 </Card>
 
                 {/* Android */}
-                <Card className="p-8">
+                <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-2xl hover:border-primary/30 transition-all duration-500 hover:-translate-y-1">
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                     <span className="text-4xl">🤖</span>
                     Android (Samsung, Google Pixel, etc.)
@@ -196,7 +206,7 @@ export default function DataWipe() {
                 </Card>
 
                 {/* Apple Watch */}
-                <Card className="p-8">
+                <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-2xl hover:border-primary/30 transition-all duration-500 hover:-translate-y-1">
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                     <span className="text-4xl">⌚</span>
                     Apple Watch
@@ -246,32 +256,32 @@ export default function DataWipe() {
                 </Card>
 
                 {/* Final Checklist */}
-                <Card className="p-8 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-                  <h2 className="text-2xl font-bold mb-6">Final Checklist Before Shipping</h2>
+                <Card className="p-8 backdrop-blur-2xl bg-green-500/10 border-green-400/30">
+                  <h2 className="text-2xl font-bold mb-6 text-white">Final Checklist Before Shipping</h2>
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                      <span className="text-sm">Backed up all important photos, contacts, and data</span>
+                      <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-sm text-white/90">Backed up all important photos, contacts, and data</span>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                      <span className="text-sm">Signed out of all accounts (iCloud, Google, Samsung, etc.)</span>
+                      <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-sm text-white/90">Signed out of all accounts (iCloud, Google, Samsung, etc.)</span>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                      <span className="text-sm">Disabled Find My iPhone/Find My Device/Activation Lock</span>
+                      <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-sm text-white/90">Disabled Find My iPhone/Find My Device/Activation Lock</span>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                      <span className="text-sm">Performed factory reset to erase all content and settings</span>
+                      <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-sm text-white/90">Performed factory reset to erase all content and settings</span>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                      <span className="text-sm">Removed SIM card and any memory cards</span>
+                      <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-sm text-white/90">Removed SIM card and any memory cards</span>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                      <span className="text-sm">Removed case and screen protector (device only)</span>
+                      <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-sm text-white/90">Removed case and screen protector (device only)</span>
                     </div>
                   </div>
                 </Card>

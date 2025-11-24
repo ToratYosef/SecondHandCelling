@@ -131,21 +131,29 @@ export default function FAQ() {
     <div className="min-h-screen flex flex-col">
       <PublicHeader />
       
-      <main className="flex-1">
-        <section className="py-16 bg-gradient-to-b from-primary/5 to-background">
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <main className="flex-1 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <section className="py-16 relative overflow-hidden">
+          {/* Dark luxury background */}
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
+            <div className="absolute top-10 left-10 w-72 h-72 bg-blue-500/10 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+          </div>
+          
+          <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
+              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 text-white animate-in fade-in duration-700">
                 Frequently Asked Questions
               </h1>
-              <p className="text-xl text-muted-foreground">
+              <p className="text-xl text-white/60">
                 Find answers to common questions about selling your device to SecondHandCell
               </p>
             </div>
           </div>
         </section>
 
-        <section className="py-16">
+        <section className="py-16 bg-background">
           <div className="max-w-7xl mx-auto px-4 md:px-6">
             <div className="max-w-4xl mx-auto space-y-12">
               {faqCategories.map((category, idx) => (
@@ -153,8 +161,8 @@ export default function FAQ() {
                   <h2 className="text-2xl font-bold mb-6">{category.category}</h2>
                   <Accordion type="single" collapsible className="space-y-4">
                     {category.faqs.map((faq, faqIdx) => (
-                      <AccordionItem key={faqIdx} value={`${idx}-${faqIdx}`} className="border rounded-lg px-6">
-                        <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                      <AccordionItem key={faqIdx} value={`${idx}-${faqIdx}`} className="backdrop-blur-md bg-card/50 border border-border/50 rounded-lg px-6 hover:bg-card/70 hover:border-primary/30 hover:shadow-lg transition-all duration-300">
+                        <AccordionTrigger className="text-left font-semibold hover:no-underline hover:text-primary transition-colors">
                           {faq.question}
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
@@ -169,20 +177,18 @@ export default function FAQ() {
           </div>
         </section>
 
-        <section className="py-16 bg-muted/40">
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
-            <div className="max-w-2xl mx-auto">
-              <Card className="p-8 text-center">
-                <h2 className="text-2xl font-bold mb-4">Still have questions?</h2>
-                <p className="text-muted-foreground mb-6">
-                  Our support team is here to help. Reach out and we'll get back to you within 24 hours.
-                </p>
-                <Button asChild size="lg" data-testid="button-contact-support">
-                  <Link href="/support">
-                    Contact Support
-                  </Link>
-                </Button>
-              </Card>
+        <section className="py-16 bg-background relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
+            <div className="max-w-2xl mx-auto text-center">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Still have questions?</h2>
+              <p className="text-lg mb-8 text-muted-foreground">
+                Our support team is here to help. Reach out and we'll get back to you within 24 hours.
+              </p>
+              <Button asChild size="lg" className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105" data-testid="button-contact-support">
+                <Link href="/support">
+                  Contact Support
+                </Link>
+              </Button>
             </div>
           </div>
         </section>

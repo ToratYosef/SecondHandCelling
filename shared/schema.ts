@@ -192,6 +192,19 @@ export const sellOrders = sqliteTable("sell_orders", {
   lockedInAt: integer("locked_in_at", { mode: "timestamp" }),
   lockedUntil: integer("locked_until", { mode: "timestamp" }),
   shipmentId: text("shipment_id"),
+  
+  // Customer contact information
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  
+  // Shipping address
+  shippingAddressLine1: text("shipping_address_line1"),
+  shippingAddressLine2: text("shipping_address_line2"),
+  shippingCity: text("shipping_city"),
+  shippingState: text("shipping_state"),
+  shippingPostalCode: text("shipping_postal_code"),
+  shippingCountry: text("shipping_country").default("US"),
+  
   payoutStatus: text("payout_status").notNull().default("not_started"), // not_started, pending, paid, failed
   payoutMethod: text("payout_method"),
   payoutDetailsJson: text("payout_details_json"), // JSON string

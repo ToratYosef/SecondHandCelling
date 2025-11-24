@@ -86,24 +86,30 @@ export default function Success() {
     <div className="min-h-screen flex flex-col">
       <PublicHeader />
       
-      <main className="flex-1 py-12">
-        <div className="max-w-3xl mx-auto px-4 md:px-6">
-          <Card className="p-8 md:p-12">
+      <main className="flex-1 py-12 relative overflow-hidden">
+        {/* Background decorative elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 right-20 w-96 h-96 bg-green-500/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 left-20 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        </div>
+        
+        <div className="max-w-3xl mx-auto px-4 md:px-6 relative z-10">
+          <Card className="p-8 md:p-12 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-2xl transition-all duration-500">
             {/* Success Icon */}
             <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Check className="w-12 h-12 text-green-600" />
+              <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/20 dark:to-green-800/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500">
+                <Check className="w-12 h-12 text-green-600 animate-pulse" />
               </div>
               
-              <h1 className="text-3xl md:text-4xl font-bold mb-4">Order Confirmed!</h1>
+              <h1 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Order Confirmed!</h1>
               <p className="text-lg text-muted-foreground">
                 Your order has been submitted successfully
               </p>
             </div>
 
             {/* Order Summary */}
-            <div className="bg-muted/40 rounded-lg p-6 mb-8">
-              <h2 className="font-semibold text-lg mb-4">Order Summary</h2>
+            <div className="backdrop-blur-md bg-muted/40 border border-border/50 rounded-lg p-6 mb-8 hover:border-primary/30 transition-colors">
+              <h2 className="font-semibold text-lg mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Order Summary</h2>
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Order Number:</span>

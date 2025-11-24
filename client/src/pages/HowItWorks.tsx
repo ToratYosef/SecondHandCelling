@@ -10,15 +10,23 @@ export default function HowItWorks() {
     <div className="min-h-screen flex flex-col">
       <PublicHeader />
       
-      <main className="flex-1">
+      <main className="flex-1 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
         {/* Hero */}
-        <section className="py-16 bg-gradient-to-b from-primary/5 to-background">
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <section className="py-16 relative overflow-hidden">
+          {/* Dark luxury background */}
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
+            <div className="absolute top-10 left-10 w-72 h-72 bg-blue-500/10 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+          </div>
+          
+          <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
+              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 text-white animate-in fade-in duration-700">
                 How It Works
               </h1>
-              <p className="text-xl text-muted-foreground leading-relaxed">
+              <p className="text-xl text-white/60 leading-relaxed">
                 Selling your device to SecondHandCell is simple, safe, and fast. Here's our complete process from quote to payout.
               </p>
             </div>
@@ -26,14 +34,14 @@ export default function HowItWorks() {
         </section>
 
         {/* Main Steps */}
-        <section className="py-16 md:py-24">
+        <section className="py-16 md:py-24 bg-background">
           <div className="max-w-7xl mx-auto px-4 md:px-6">
             <div className="max-w-4xl mx-auto space-y-16">
               {/* Step 1 */}
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-white flex items-center justify-center font-bold text-xl">
                       1
                     </div>
                     <Search className="w-8 h-8 text-primary" />
@@ -57,17 +65,17 @@ export default function HowItWorks() {
                     </li>
                   </ul>
                 </div>
-                <Card className="p-8 bg-muted/40">
+                <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2">
                   <div className="space-y-4">
-                    <div className="p-4 bg-background rounded-md border">
+                    <div className="p-4 bg-background/80 rounded-md border border-border/50 hover:border-primary/30 transition-colors">
                       <p className="text-sm font-medium mb-1">Device</p>
                       <p className="text-lg font-semibold">iPhone 14 Pro, 256GB</p>
                     </div>
-                    <div className="p-4 bg-background rounded-md border">
+                    <div className="p-4 bg-background/80 rounded-md border border-border/50 hover:border-primary/30 transition-colors">
                       <p className="text-sm font-medium mb-1">Condition</p>
                       <p className="text-lg font-semibold">Good</p>
                     </div>
-                    <div className="p-4 bg-primary text-primary-foreground rounded-md">
+                    <div className="p-4 bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-md shadow-lg hover:shadow-xl transition-shadow">
                       <p className="text-sm opacity-90 mb-1">Your Instant Offer</p>
                       <p className="text-3xl font-bold">$445</p>
                     </div>
@@ -79,7 +87,7 @@ export default function HowItWorks() {
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div className="md:order-2">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-white flex items-center justify-center font-bold text-xl">
                       2
                     </div>
                     <Lock className="w-8 h-8 text-primary" />
@@ -103,17 +111,17 @@ export default function HowItWorks() {
                     </li>
                   </ul>
                 </div>
-                <Card className="p-8 bg-muted/40 md:order-1">
+                <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50 md:order-1 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-background rounded-md border">
+                    <div className="flex items-center justify-between p-4 bg-background/80 rounded-md border border-border/50 hover:border-green-500/30 transition-colors">
                       <span className="font-medium">Print Label</span>
                       <span className="text-sm text-green-600 font-semibold">FREE</span>
                     </div>
-                    <div className="flex items-center justify-between p-4 bg-background rounded-md border">
+                    <div className="flex items-center justify-between p-4 bg-background/80 rounded-md border border-border/50 hover:border-green-500/30 transition-colors">
                       <span className="font-medium">Mail-in Kit</span>
                       <span className="text-sm text-green-600 font-semibold">FREE</span>
                     </div>
-                    <div className="p-4 bg-background rounded-md border">
+                    <div className="p-4 bg-background/80 rounded-md border border-border/50 hover:border-primary/30 transition-colors">
                       <p className="text-sm text-muted-foreground mb-2">Offer expires</p>
                       <p className="font-semibold">14 days from lock-in</p>
                     </div>
@@ -125,7 +133,7 @@ export default function HowItWorks() {
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-white flex items-center justify-center font-bold text-xl">
                       3
                     </div>
                     <Package className="w-8 h-8 text-primary" />
@@ -163,30 +171,30 @@ export default function HowItWorks() {
                     </div>
                   </Card>
                 </div>
-                <Card className="p-8 bg-muted/40">
+                <Card className="p-8 backdrop-blur-md bg-card/50 border-border/50 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2">
                   <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-600/20 dark:to-cyan-600/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
                       <Package className="w-8 h-8 text-primary" />
                     </div>
                     <p className="font-semibold">Device Received</p>
                     <p className="text-sm text-muted-foreground">Inspection in progress</p>
                   </div>
                   <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-sm">Physical condition check</span>
+                    <div className="flex items-center gap-3 group">
+                      <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse"></div>
+                      <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">Physical condition check</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-sm">Functionality testing</span>
+                    <div className="flex items-center gap-3 group">
+                      <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                      <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">Functionality testing</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-sm">IMEI/blacklist verification</span>
+                    <div className="flex items-center gap-3 group">
+                      <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" style={{ animationDelay: '400ms' }}></div>
+                      <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">IMEI/blacklist verification</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-muted"></div>
-                      <span className="text-sm text-muted-foreground">Final approval</span>
+                    <div className="flex items-center gap-3 group">
+                      <div className="w-2 h-2 rounded-full bg-border"></div>
+                      <span className="text-sm text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">Final approval</span>
                     </div>
                   </div>
                 </Card>
@@ -196,12 +204,12 @@ export default function HowItWorks() {
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div className="md:order-2">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-white flex items-center justify-center font-bold text-xl">
                       4
                     </div>
                     <DollarSign className="w-8 h-8 text-primary" />
                   </div>
-                  <h2 className="text-2xl font-bold mb-4">Get Paid</h2>
+                  <h2 className="text-2xl font-bold mb-4">Get Paid Fast</h2>
                   <p className="text-muted-foreground mb-4">
                     Once you accept the offer, we process your payment immediately. Choose your preferred payout method and receive your money fast.
                   </p>
@@ -224,18 +232,18 @@ export default function HowItWorks() {
                     </li>
                   </ul>
                 </div>
-                <Card className="p-8 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 md:order-1">
+                <Card className="p-8 backdrop-blur-md bg-green-50 dark:bg-green-950/20 border-2 border-green-500 md:order-1 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 hover:border-green-600">
                   <div className="text-center">
-                    <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
+                    <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4 animate-pulse" />
                     <h3 className="text-xl font-bold mb-2">Payment Sent!</h3>
                     <p className="text-sm text-muted-foreground mb-6">
                       Your payout has been processed
                     </p>
-                    <div className="p-4 bg-background rounded-md">
+                    <div className="p-4 bg-background/80 rounded-md border border-border/50 hover:border-green-500/30 transition-colors">
                       <p className="text-sm text-muted-foreground mb-1">Amount</p>
                       <p className="text-3xl font-bold text-green-600">$445.00</p>
                     </div>
-                    <div className="mt-4 p-3 bg-background rounded-md text-left">
+                    <div className="mt-4 p-3 bg-background/80 rounded-md text-left border border-border/50 hover:border-green-500/30 transition-colors">
                       <p className="text-xs text-muted-foreground">Method</p>
                       <p className="text-sm font-medium">PayPal - user@email.com</p>
                     </div>
@@ -247,15 +255,15 @@ export default function HowItWorks() {
         </section>
 
         {/* CTA */}
-        <section className="py-16 bg-primary text-primary-foreground">
-          <div className="container px-4 md:px-6 text-center">
+        <section className="py-16 bg-background relative overflow-hidden">
+          <div className="container px-4 md:px-6 text-center relative z-10">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Ready to get started?
             </h2>
-            <p className="text-lg mb-8 opacity-90">
+            <p className="text-lg mb-8 text-muted-foreground">
               Get your instant quote in less than 2 minutes
             </p>
-            <Button asChild size="lg" variant="secondary" data-testid="button-cta-start-quote">
+            <Button asChild size="lg" className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105" data-testid="button-cta-start-quote">
               <Link href="/sell">
                 Start Your Quote
               </Link>
