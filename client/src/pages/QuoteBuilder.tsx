@@ -167,7 +167,10 @@ export default function QuoteBuilder() {
       });
       return;
     }
-    if (step < 4) setStep(step + 1);
+    if (step < 4) {
+      setStep(step + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const prevStep = () => {
@@ -178,6 +181,7 @@ export default function QuoteBuilder() {
         pricingMutation.reset();
       }
       setStep(step - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 

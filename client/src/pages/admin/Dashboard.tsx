@@ -1,18 +1,30 @@
+import { useState, useEffect } from "react";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { AdminProtected } from "@/components/AdminProtected";
 import { Card } from "@/components/ui/card";
 import { FileText, Package, DollarSign, AlertCircle, TrendingUp, Users, Smartphone } from "lucide-react";
 
 export default function AdminDashboard() {
-  const [metrics, setMetrics] = useState<any>({});
+  const [metrics, setMetrics] = useState<any>({
+    totalOrders: 0,
+    completedOrders: 0,
+    pendingOrders: 0,
+    totalRevenue: 0,
+    totalUsers: 0,
+    activeDevices: 0
+  });
   const [agingOrders, setAgingOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetch("/api/admin/analytics")
       .then(res => res.json())
       .then(data => {
-        setMetrics(data.metrics);
-        setAgingOrders(data.aging);
+        setMetrics(data.metrics || {});
+        setAgingOrders(data.aging || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to load analytics:", err);
         setLoading(false);
       });
   }, []);

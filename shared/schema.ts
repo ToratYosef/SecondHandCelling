@@ -349,7 +349,9 @@ export const insertBuybackPricingRuleSchema = createInsertSchema(buybackPricingR
 export const insertQuoteRequestSchema = createInsertSchema(quoteRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertQuoteLineItemSchema = createInsertSchema(quoteLineItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSellOrderSchema = createInsertSchema(sellOrders).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertSellOrderItemSchema = createInsertSchema(sellOrderItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSellOrderItemSchema = createInsertSchema(sellOrderItems).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+  deviceVariantId: z.string().nullable().optional(),
+});
 export const insertShipmentSchema = createInsertSchema(shipments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true });

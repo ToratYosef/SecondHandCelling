@@ -85,17 +85,28 @@ export default function Sell() {
     enabled: !!selectedBrand,
   });
 
+  const { data: conditions = [] } = useQuery<any[]>({
+    queryKey: ["/api/conditions"],
+    queryFn: async () => {
+      const res = await fetch("/api/conditions");
+      if (!res.ok) throw new Error("Failed to load conditions");
+      return res.json();
+    },
+  });
+
   const storageOptions = ["64GB", "128GB", "256GB", "512GB", "1TB"];
   const carrierOptions = ["AT&T", "Verizon", "T-Mobile", "Unlocked"];
 
   const handleBrandSelect = (brandId: string) => {
     setSelectedBrand(brandId);
     setStep('model');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleModelSelect = (modelId: string) => {
     setSelectedModel(modelId);
     setStep('questions');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const calculateOffer = () => {
@@ -129,10 +140,12 @@ export default function Sell() {
     
     setCalculatedOffer(Math.max(basePrice, 50));
     setStep('quote');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleContinueAsGuest = () => {
     setStep('shipping');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleShippingSubmit = () => {
@@ -168,11 +181,17 @@ export default function Sell() {
         }
         const order = await res.json();
         // Create order item
+        // Use the first condition profile (typically "Good" or default condition)
+        const conditionId = conditions && conditions.length > 0 ? conditions[0].id : null;
+        
+        if (!conditionId) {
+          throw new Error("No condition profiles available");
+        }
+        
         const itemPayload = {
           deviceModelId: selectedModel,
-          // deviceVariantId should be the actual variant ID, not storage string
-          deviceVariantId: storage,
-          claimedConditionProfileId: "default", // You may need to select or map this from UI
+          deviceVariantId: null, // Optional - will be null if no specific variant selected
+          claimedConditionProfileId: conditionId,
           originalOfferAmount: calculatedOffer,
         };
         await fetch(`/api/orders/${order.id}/items`, {
@@ -182,6 +201,7 @@ export default function Sell() {
         });
         setShowPaymentDialog(false);
         setStep('confirmed');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch((err) => {
         console.error("Order submission failed:", err);
@@ -230,7 +250,10 @@ export default function Sell() {
             <Card className="p-8">
               <Button
                 variant="ghost"
-                onClick={() => setStep('brand')}
+                onClick={() => {
+                  setStep('brand');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 className="mb-4"
                 data-testid="button-back"
               >
@@ -262,7 +285,10 @@ export default function Sell() {
             <Card className="p-8">
               <Button
                 variant="ghost"
-                onClick={() => setStep('model')}
+                onClick={() => {
+                  setStep('model');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 className="mb-4"
                 data-testid="button-back-to-model"
               >

@@ -332,89 +332,24 @@ export default function AdminPricing() {
                                 <TableCell>
                                   <Button size="sm" onClick={() => savePrice(rule?.id)} disabled={!editPrices[rule?.id]}>Save</Button>
                                 </TableCell>
-                              {isLoading ? (
-                                <Card>
-                                  <div className="p-8 space-y-4">
-                                    <Skeleton className="h-12 w-full" />
-                                    <Skeleton className="h-12 w-full" />
-                                    <Skeleton className="h-12 w-full" />
-                                  </div>
-                                </Card>
-                              ) : devices && devices.length > 0 ? (
-                                <Card>
-                                  {devices
-                                    .filter(device =>
-                                      device.name.toLowerCase().includes(search.toLowerCase()) ||
-                                      device.variants.some(variant =>
-                                        `${variant.storageGb}GB ${variant.color || ''} ${variant.networkCarrier}`.toLowerCase().includes(search.toLowerCase())
-                                      )
-                                    )
-                                    .map((device) => (
-                                    <div key={device.id} className="mb-8">
-                                      <h2 className="text-xl font-bold mb-2">{device.name}</h2>
-                                      {device.variants
-                                        .filter(variant =>
-                                          search === "" ||
-                                          `${variant.storageGb}GB ${variant.color || ''} ${variant.networkCarrier}`.toLowerCase().includes(search.toLowerCase()) ||
-                                          device.name.toLowerCase().includes(search.toLowerCase())
-                                        )
-                                        .map((variant) => (
-                                        <div key={variant.id} className="mb-4">
-                                          <h3 className="font-semibold">Variant: {variant.storageGb}GB {variant.color || ''} {variant.networkCarrier}</h3>
-                                          <Table>
-                                            <TableHeader>
-                                              <TableRow>
-                                                <TableHead>Condition</TableHead>
-                                                <TableHead>Price</TableHead>
-                                                <TableHead>Save</TableHead>
-                                                <TableHead>Select</TableHead>
-                                              </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                              {conditions && conditions
-                                                .filter(cond => filterCondition === "" || cond.id === filterCondition)
-                                                .map((cond) => {
-                                                  const rule = pricingRules?.find(r => r.variantId === variant.id && r.conditionProfileId === cond.id);
-                                                  const checked = selectedRules.includes(rule?.id);
-                                                  return (
-                                                    <TableRow key={cond.id}>
-                                                      <TableCell>{cond.name}</TableCell>
-                                                      <TableCell>
-                                                        <Input
-                                                          type="number"
-                                                          value={editPrices[rule?.id] ?? rule?.basePrice ?? ''}
-                                                          onChange={e => handlePriceChange(rule?.id, e.target.value)}
-                                                          placeholder="Price"
-                                                        />
-                                                      </TableCell>
-                                                      <TableCell>
-                                                        <Button size="sm" onClick={() => savePrice(rule?.id)} disabled={!editPrices[rule?.id]}>Save</Button>
-                                                      </TableCell>
-                                                      <TableCell>
-                                                        <input
-                                                          type="checkbox"
-                                                          checked={checked}
-                                                          onChange={e => {
-                                                            setSelectedRules(prev =>
-                                                              e.target.checked
-                                                                ? [...prev, rule?.id]
-                                                                : prev.filter(id => id !== rule?.id)
-                                                            );
-                                                          }}
-                                                        />
-                                                      </TableCell>
-                                                    </TableRow>
-                                                  );
-                                                })}
-                                            </TableBody>
-                                          </Table>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ))}
-                                </Card>
-                              ) : (
-                                <Card className="p-12 text-center">
-                                  <p className="text-muted-foreground">No devices found</p>
-                                </Card>
-                              )}
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </Card>
+          ) : (
+            <Card className="p-12 text-center">
+              <p className="text-muted-foreground">No devices found</p>
+            </Card>
+          )}
+        </div>
+        </main>
+      </div>
+    </AdminProtected>
+  );
+}

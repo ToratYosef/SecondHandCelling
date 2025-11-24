@@ -3,6 +3,7 @@ import { PublicFooter } from "@/components/PublicFooter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DeviceCard } from "@/components/DeviceCard";
+import { InstantQuoteWidget } from "@/components/InstantQuoteWidget";
 import { Link } from "wouter";
 import { Search, Lock, Package, DollarSign, Shield, TrendingUp, FileCheck, Zap, Star } from "lucide-react";
 
@@ -57,22 +58,7 @@ export default function Home() {
               </div>
               
               <div className="relative">
-                <Card className="p-8 bg-background">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-20 h-20 bg-primary/10 rounded-lg flex items-center justify-center text-4xl">
-                      📱
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">iPhone 15 Pro</h3>
-                      <p className="text-sm text-muted-foreground">256GB, Unlocked</p>
-                    </div>
-                  </div>
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-muted-foreground mb-2">Your device is worth</p>
-                    <p className="text-4xl font-bold text-primary">$510</p>
-                    <p className="text-xs text-muted-foreground mt-2">Offer valid for 14 days</p>
-                  </div>
-                </Card>
+                <InstantQuoteWidget />
               </div>
             </div>
           </div>

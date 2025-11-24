@@ -13,8 +13,255 @@ import { hashPassword, comparePassword, requireAuth, requireAdmin } from "./auth
 import { z } from "zod";
 import { calculateDeviceOffer } from "./pricing";
 import { getSiteSettings, updateSiteLogo } from "./siteSettings";
+import { 
+  sendOrderConfirmation, 
+  sendShippingLabel, 
+  sendDeviceReceived, 
+  sendInspectionComplete, 
+  sendPaymentConfirmation,
+  sendStatusUpdate 
+} from "./email";
+import { checkIMEI, isValidIMEI, getDeviceInfoFromIMEI } from "./phonecheck";
+import { createShippingLabel, trackShipment, voidLabel, getRateEstimates } from "./shipengine";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+    // ==========================================================================
+    // ADMIN QUICK STATS (for top bar)
+    // ==========================================================================
+    app.get("/api/admin/quick-stats", requireAdmin, async (req, res) => {
+      try {
+        const orders = await storage.getAllSellOrders();
+        const today = new Date().toISOString().split('T')[0];
+        
+        const todayOrders = orders.filter(o => {
+          if (!o.createdAt) return false;
+          try {
+            const created = typeof o.createdAt === 'string' ? o.createdAt : new Date(o.createdAt).toISOString();
+            return created.startsWith(today);
+          } catch {
+            return false;
+          }
+        }).length;
+        const pending = orders.filter(o => ['label_pending', 'awaiting_device', 'in_transit'].includes(o.status)).length;
+        const needsPrinting = orders.filter(o => o.status === 'label_pending').length;
+        
+        res.json({ todayOrders, pending, needsPrinting });
+      } catch (error) {
+        console.error('Quick stats error:', error);
+        res.status(500).json({ error: "Failed to fetch quick stats" });
+      }
+    });
+
+    // ==========================================================================
+    // ADMIN DASHBOARD STATS (for dashboard cards)
+    // ==========================================================================
+    app.get("/api/admin/dashboard-stats", requireAdmin, async (req, res) => {
+      try {
+        const orders = await storage.getAllSellOrders();
+        const now = new Date();
+        const thisMonth = orders.filter(o => {
+          const createdDate = new Date(o.createdAt);
+          return createdDate.getMonth() === now.getMonth() && createdDate.getFullYear() === now.getFullYear();
+        });
+        const today = now.toISOString().split('T')[0];
+        
+        const totalOrders = orders.length;
+        const monthOrders = thisMonth.length;
+        const pendingOrders = orders.filter(o => !['completed', 'cancelled'].includes(o.status)).length;
+        const needsPrinting = orders.filter(o => o.status === 'label_pending').length;
+        const receivedToday = orders.filter(o => {
+          if (!o.updatedAt || o.status !== 'received') return false;
+          try {
+            const updated = typeof o.updatedAt === 'string' ? o.updatedAt : new Date(o.updatedAt).toISOString();
+            return updated.startsWith(today);
+          } catch {
+            return false;
+          }
+        }).length;
+        const avgOrderValue = orders.length > 0 
+          ? (orders.reduce((sum, o) => sum + (typeof o.totalOriginalOffer === 'number' ? o.totalOriginalOffer : parseFloat(o.totalOriginalOffer || '0')), 0) / orders.length).toFixed(2)
+          : '0.00';
+        
+        res.json({ 
+          totalOrders, 
+          monthOrders, 
+          pendingOrders, 
+          needsPrinting, 
+          receivedToday, 
+          avgOrderValue 
+        });
+      } catch (error) {
+        res.status(500).json({ error: "Failed to fetch dashboard stats" });
+      }
+    });
+
+    // ==========================================================================
+    // ADMIN ORDERS LIST (with filters, pagination, search)
+    // ==========================================================================
+    app.get("/api/admin/orders", requireAdmin, async (req, res) => {
+      try {
+        const { search, status, dateRange, page = '1', pageSize = '20' } = req.query;
+        let orders = await storage.getAllSellOrders();
+        
+        // Apply filters
+        if (search && typeof search === 'string') {
+          const searchLower = search.toLowerCase();
+          orders = orders.filter(o => 
+            o.orderNumber.toLowerCase().includes(searchLower) ||
+            (o.notesCustomer && o.notesCustomer.toLowerCase().includes(searchLower))
+          );
+        }
+        
+        if (status && status !== 'all') {
+          orders = orders.filter(o => o.status === status);
+        }
+        
+        if (dateRange && dateRange !== 'all') {
+          const now = new Date();
+          const ranges: Record<string, number> = {
+            today: 0,
+            week: 7,
+            month: 30,
+          };
+          const daysAgo = ranges[dateRange as string];
+          if (daysAgo !== undefined) {
+            const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+            orders = orders.filter(o => new Date(o.createdAt) >= cutoffDate);
+          }
+        }
+        
+        // Sort by created date (newest first)
+        orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        // Pagination
+        const pageNum = parseInt(page as string);
+        const pageSizeNum = parseInt(pageSize as string);
+        const total = orders.length;
+        const paginatedOrders = orders.slice((pageNum - 1) * pageSizeNum, pageNum * pageSizeNum);
+        
+        // Enrich with customer info and items
+        const enrichedOrders = await Promise.all(paginatedOrders.map(async (order) => {
+          const items = await storage.getSellOrderItemsByOrder(order.id);
+          const itemsWithDetails = await Promise.all(items.map(async (item) => {
+            const model = item.deviceModelId ? await storage.getModel(item.deviceModelId) : null;
+            const variant = item.deviceVariantId ? await storage.getVariant(item.deviceVariantId) : null;
+            return { ...item, deviceModel: model, deviceVariant: variant };
+          }));
+          
+          // Extract customer info from notes
+          let customerName = 'Guest';
+          let customerEmail = '';
+          if (order.notesCustomer) {
+            const emailMatch = order.notesCustomer.match(/Email:\s*([^\s,]+)/);
+            const nameMatch = order.notesCustomer.match(/Name:\s*([^,\n]+)/);
+            if (emailMatch) customerEmail = emailMatch[1];
+            if (nameMatch) customerName = nameMatch[1].trim();
+          }
+          
+          return {
+            ...order,
+            items: itemsWithDetails,
+            customerName,
+            customerEmail,
+            labelStatus: order.shipmentId ? 'generated' : 'none',
+          };
+        }));
+        
+        res.json({ orders: enrichedOrders, total, page: pageNum, pageSize: pageSizeNum });
+      } catch (error) {
+        console.error("Failed to fetch orders:", error);
+        res.status(500).json({ error: "Failed to fetch orders" });
+      }
+    });
+
+    // ==========================================================================
+    // ADMIN GET SINGLE ORDER DETAILS
+    // ==========================================================================
+    app.get("/api/admin/orders/:id", requireAdmin, async (req, res) => {
+      try {
+        const order = await storage.getSellOrder(req.params.id);
+        if (!order) {
+          return res.status(404).json({ error: "Order not found" });
+        }
+
+        // Get order items with device details
+        const items = await storage.getSellOrderItemsByOrder(order.id);
+        const itemsWithDetails = await Promise.all(items.map(async (item) => {
+          const model = item.deviceModelId ? await storage.getModel(item.deviceModelId) : null;
+          const variant = item.deviceVariantId ? await storage.getVariant(item.deviceVariantId) : null;
+          const condition = item.claimedConditionProfileId ? await storage.getConditionProfile(item.claimedConditionProfileId) : null;
+          return { 
+            ...item, 
+            deviceModel: model, 
+            deviceVariant: variant,
+            conditionProfile: condition
+          };
+        }));
+
+        // Extract customer info from notes
+        let customerName = 'Guest';
+        let customerEmail = '';
+        let customerPhone = '';
+        let customerAddress = '';
+        if (order.notesCustomer) {
+          const emailMatch = order.notesCustomer.match(/Email:\s*([^\s,]+)/);
+          const nameMatch = order.notesCustomer.match(/Name:\s*([^,\n]+)/);
+          const phoneMatch = order.notesCustomer.match(/Phone:\s*([^,\n]+)/);
+          const addressMatch = order.notesCustomer.match(/Address:\s*([^,\n]+(?:\n[^:]+)*)/);
+          if (emailMatch) customerEmail = emailMatch[1];
+          if (nameMatch) customerName = nameMatch[1].trim();
+          if (phoneMatch) customerPhone = phoneMatch[1].trim();
+          if (addressMatch) customerAddress = addressMatch[1].trim();
+        }
+
+        // Get shipment info if exists
+        let shipment = null;
+        if (order.shipmentId) {
+          shipment = await storage.getShipment(order.shipmentId);
+        }
+
+        res.json({
+          ...order,
+          items: itemsWithDetails,
+          customerName,
+          customerEmail,
+          customerPhone,
+          customerAddress,
+          shipment,
+          labelStatus: order.shipmentId ? 'generated' : 'none',
+        });
+      } catch (error) {
+        console.error("Failed to fetch order details:", error);
+        res.status(500).json({ error: "Failed to fetch order details" });
+      }
+    });
+
+    // ==========================================================================
+    // ADMIN ORDER STATUS UPDATE
+    // ==========================================================================
+    app.post("/api/admin/orders/:id/status", requireAdmin, async (req, res) => {
+      try {
+        const { status } = req.body;
+        const order = await storage.updateSellOrder(req.params.id, { status });
+        
+        if (!order) {
+          return res.status(404).json({ error: "Order not found" });
+        }
+        
+        // Send status update email if customer email is available
+        if (order.notesCustomer) {
+          const emailMatch = order.notesCustomer.match(/Email:\s*([^\s,]+)/);
+          if (emailMatch) {
+            await sendStatusUpdate(emailMatch[1], order.orderNumber, status, `Your order status has been updated to: ${status.replace('_', ' ')}`);
+          }
+        }
+        
+        res.json(order);
+      } catch (error) {
+        res.status(500).json({ error: "Failed to update status" });
+      }
+    });
+
     // ==========================================================================
     // ADMIN ANALYTICS & AGING ORDERS
     // ==========================================================================
@@ -44,34 +291,323 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ error: "Failed to fetch analytics" });
       }
     });
+
+    // ==========================================================================
+    // ADMIN ANALYTICS FULL (for analytics dashboard)
+    // ==========================================================================
+    app.get("/api/admin/analytics/full", requireAdmin, async (req, res) => {
+      try {
+        const { range = 'month' } = req.query;
+        const orders = await storage.getAllSellOrders();
+        const now = new Date();
+        
+        // Calculate date range
+        let startDate = new Date();
+        if (range === 'week') startDate.setDate(now.getDate() - 7);
+        else if (range === 'month') startDate.setDate(now.getDate() - 30);
+        else if (range === 'quarter') startDate.setDate(now.getDate() - 90);
+        else if (range === 'year') startDate.setDate(now.getDate() - 365);
+        
+        const filteredOrders = orders.filter(o => new Date(o.createdAt) >= startDate);
+        
+        // Orders over time
+        const ordersOverTime = filteredOrders.reduce((acc: any[], o) => {
+          const date = (typeof o.createdAt === 'string' ? o.createdAt : o.createdAt.toISOString()).split('T')[0];
+          const existing = acc.find(d => d.date === date);
+          if (existing) {
+            existing.orders++;
+            existing.value += typeof o.totalOriginalOffer === 'number' ? o.totalOriginalOffer : parseFloat(o.totalOriginalOffer || '0');
+          } else {
+            acc.push({ date, orders: 1, value: typeof o.totalOriginalOffer === 'number' ? o.totalOriginalOffer : parseFloat(o.totalOriginalOffer || '0') });
+          }
+          return acc;
+        }, []).sort((a, b) => a.date.localeCompare(b.date));
+        
+        // Status distribution
+        const statusDistribution = filteredOrders.reduce((acc: any[], o) => {
+          const existing = acc.find(s => s.status === o.status);
+          if (existing) {
+            existing.count++;
+          } else {
+            acc.push({ status: o.status, count: 1 });
+          }
+          return acc;
+        }, []);
+        
+        // Top devices
+        const allOrders = await storage.getAllSellOrders();
+        const allItems = await Promise.all(allOrders.map(o => storage.getSellOrderItemsByOrder(o.id)));
+        const items = allItems.flat();
+        const deviceMap = new Map();
+        for (const item of items.filter((i: any) => filteredOrders.find(o => o.id === i.sellOrderId))) {
+          const order = filteredOrders.find(o => o.id === item.sellOrderId);
+          if (!order) continue;
+          
+          const model = await storage.getModel(item.deviceModelId);
+          const key = model?.name || 'Unknown Device';
+          const amount = typeof item.originalOfferAmount === 'number' ? item.originalOfferAmount : parseFloat(item.originalOfferAmount || '0');
+          
+          if (deviceMap.has(key)) {
+            const d = deviceMap.get(key);
+            d.count++;
+            d.totalAmount += amount;
+          } else {
+            deviceMap.set(key, { model: key, count: 1, totalAmount: amount });
+          }
+        }
+        const topDevices = Array.from(deviceMap.values())
+          .map(d => ({ ...d, avgAmount: d.totalAmount / d.count }))
+          .sort((a, b) => b.totalAmount - a.totalAmount)
+          .slice(0, 10);
+        
+        // Revenue metrics
+        const totalRevenue = filteredOrders.reduce((sum, o) => sum + (typeof o.totalOriginalOffer === 'number' ? o.totalOriginalOffer : parseFloat(o.totalOriginalOffer || '0')), 0);
+        const avgOrderValue = filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
+        
+        // Conversion funnel
+        const quotes = filteredOrders.length;
+        const labeled = filteredOrders.filter(o => ['awaiting_device', 'in_transit', 'received', 'inspecting', 'completed'].includes(o.status)).length;
+        const shipped = filteredOrders.filter(o => ['in_transit', 'received', 'inspecting', 'completed'].includes(o.status)).length;
+        const received = filteredOrders.filter(o => ['received', 'inspecting', 'completed'].includes(o.status)).length;
+        const inspected = filteredOrders.filter(o => ['inspecting', 'completed'].includes(o.status)).length;
+        const completed = filteredOrders.filter(o => o.status === 'completed').length;
+        
+        res.json({
+          ordersOverTime,
+          statusDistribution,
+          topDevices,
+          revenue: { totalPaidOut: totalRevenue, avgOrderValue, totalOrders: filteredOrders.length },
+          funnel: { quotes, labeled, shipped, received, inspected, completed },
+        });
+      } catch (error) {
+        res.status(500).json({ error: "Failed to fetch analytics" });
+      }
+    });
+
+    // ==========================================================================
+    // PRINT QUEUE ROUTES
+    // ==========================================================================
+    app.get("/api/admin/orders/needs-printing", requireAdmin, async (req, res) => {
+      try {
+        const orders = await storage.getAllSellOrders();
+        const needsPrinting = orders.filter(o => o.status === 'label_pending');
+        res.json(needsPrinting);
+      } catch (error) {
+        res.status(500).json({ error: "Failed to fetch print queue" });
+      }
+    });
+
+    app.post("/api/admin/orders/needs-printing/bundle", requireAdmin, async (req, res) => {
+      try {
+        const { orderIds } = req.body;
+        // In production, you'd generate a combined PDF here
+        // For now, return success with placeholder URL
+        res.json({ 
+          success: true, 
+          bundleUrl: `/api/admin/print-bundle/${orderIds.join('-')}.pdf` 
+        });
+      } catch (error) {
+        res.status(500).json({ error: "Failed to create bundle" });
+      }
+    });
+
+    app.post("/api/admin/orders/:id/mark-kit-sent", requireAdmin, async (req, res) => {
+      try {
+        const orderId = req.params.id;
+        await storage.updateSellOrder(orderId, { status: 'awaiting_device' });
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: "Failed to mark kit sent" });
+      }
+    });
+
+    // ==========================================================================
+    // CLICKS ANALYTICS ROUTES
+    // ==========================================================================
+    app.get("/api/admin/clicks", requireAdmin, async (req, res) => {
+      try {
+        const { family = 'all', range = 'month', sortBy = 'clicks' } = req.query;
+        
+        // Mock click data - in production, track this in database
+        const devices = [
+          { name: "iPhone 15 Pro Max", family: "iPhone", clicks: 342, orders: 28, conversionRate: 8.2, lastClicked: new Date().toISOString(), trend: 12 },
+          { name: "iPhone 15 Pro", family: "iPhone", clicks: 289, orders: 24, conversionRate: 8.3, lastClicked: new Date().toISOString(), trend: 8 },
+          { name: "Samsung Galaxy S24 Ultra", family: "Samsung", clicks: 198, orders: 15, conversionRate: 7.6, lastClicked: new Date().toISOString(), trend: -3 },
+          { name: "iPhone 14 Pro Max", family: "iPhone", clicks: 176, orders: 14, conversionRate: 8.0, lastClicked: new Date().toISOString(), trend: -5 },
+          { name: "Google Pixel 8 Pro", family: "Google", clicks: 124, orders: 9, conversionRate: 7.3, lastClicked: new Date().toISOString(), trend: 15 },
+        ];
+        
+        let filtered = family !== 'all' ? devices.filter(d => d.family === family) : devices;
+        
+        if (sortBy === 'conversion') filtered.sort((a, b) => b.conversionRate - a.conversionRate);
+        else if (sortBy === 'orders') filtered.sort((a, b) => b.orders - a.orders);
+        
+        const totalClicks = filtered.reduce((sum, d) => sum + d.clicks, 0);
+        const totalOrders = filtered.reduce((sum, d) => sum + d.orders, 0);
+        const avgConversion = totalClicks > 0 ? ((totalOrders / totalClicks) * 100).toFixed(1) : '0';
+        
+        res.json({
+          metrics: {
+            totalClicks,
+            uniqueDevices: filtered.length,
+            conversionRate: avgConversion,
+          },
+          devices: filtered,
+        });
+      } catch (error) {
+        res.status(500).json({ error: "Failed to fetch click data" });
+      }
+    });
+
+    // ==========================================================================
+    // EMAIL MANAGEMENT ROUTES
+    // ==========================================================================
+    app.post("/api/admin/emails/send", requireAdmin, async (req, res) => {
+      try {
+        const { to, subject, body } = req.body;
+        
+        // Use sendRawEmail for custom emails
+        const { sendRawEmail } = await import('./email');
+        await sendRawEmail(to, subject, body);
+        
+        // In production, save to email history table
+        res.json({ success: true, sentAt: new Date().toISOString() });
+      } catch (error: any) {
+        console.error("Email send error:", error);
+        res.status(500).json({ error: error.message || "Failed to send email" });
+      }
+    });
+
+    app.get("/api/admin/emails/history", requireAdmin, async (req, res) => {
+      try {
+        // Mock email history - in production, query from email_logs table
+        const emails = [
+          { id: '1', to: 'customer@example.com', subject: 'Order Status Update', sentAt: new Date().toISOString(), status: 'sent' },
+          { id: '2', to: 'user@example.com', subject: 'Payment Confirmation', sentAt: new Date(Date.now() - 86400000).toISOString(), status: 'sent' },
+        ];
+        res.json({ emails });
+      } catch (error) {
+        res.status(500).json({ error: "Failed to fetch email history" });
+      }
+    });
+
   // ==========================================================================
   // SHIPMENT & LABEL ROUTES
   // ==========================================================================
+
+  // Helper function to convert state names to abbreviations
+  const stateNameToAbbr = (stateName: string): string => {
+    const states: Record<string, string> = {
+      'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+      'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
+      'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
+      'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+      'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
+      'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+      'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+      'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+      'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+      'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY',
+      'district of columbia': 'DC', 'puerto rico': 'PR'
+    };
+    
+    const normalized = stateName.toLowerCase().trim();
+    // If already 2 characters and uppercase, return as-is
+    if (stateName.length === 2 && stateName === stateName.toUpperCase()) {
+      return stateName;
+    }
+    // Otherwise, look up the abbreviation
+    return states[normalized] || stateName;
+  };
 
   // Generate shipping label for an order
   app.post("/api/admin/orders/:id/shipment", requireAdmin, async (req, res) => {
     try {
       const orderId = req.params.id;
-      // TODO: Integrate with real carrier API. For now, generate a fake label URL.
-      const labelUrl = `/labels/label-${orderId}.pdf`;
+      const order = await storage.getSellOrder(orderId);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      
+      // Extract shipping info from order notes
+      let toAddress: any = {};
+      let customerEmail = '';
+      
+      if (order.notesCustomer) {
+        const emailMatch = order.notesCustomer.match(/Email:\s*([^\s,]+)/);
+        const addressMatch = order.notesCustomer.match(/Address:\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+)/);
+        const phoneMatch = order.notesCustomer.match(/Phone:\s*([^\s,]+)/);
+        
+        if (emailMatch) customerEmail = emailMatch[1];
+        
+        if (addressMatch) {
+          const stateProv = addressMatch[3].trim();
+          toAddress = {
+            name: customerEmail.split('@')[0] || 'Customer',
+            address_line1: addressMatch[1].trim(),
+            city_locality: addressMatch[2].trim(),
+            state_province: stateNameToAbbr(stateProv),
+            postal_code: addressMatch[4].trim(),
+            country_code: 'US',
+            phone: phoneMatch ? phoneMatch[1] : '',
+            email: customerEmail,
+          };
+        } else {
+          return res.status(400).json({ error: "Missing shipping address in order" });
+        }
+      } else {
+        return res.status(400).json({ error: "No customer information found" });
+      }
+      
+      // Generate shipping label using ShipEngine
+      const label = await createShippingLabel(toAddress, order.orderNumber, {
+        weight: 16, // Default 1 lb for phones
+        serviceCode: 'usps_ground_advantage', // USPS Ground Advantage
+      });
+      
+      // Save shipment info
       const shipment = await storage.createShipment({
         sellOrderId: orderId,
-        carrierName: "USPS",
-        serviceLevel: "Priority",
-        trackingNumber: `TRACK${Math.floor(Math.random() * 1000000)}`,
-        labelUrl,
-        labelCost: 0,
+        carrierName: label.carrier,
+        serviceLevel: label.serviceCode,
+        trackingNumber: label.trackingNumber,
+        labelUrl: label.labelUrl,
+        labelCost: label.cost,
         labelPaidBy: "company",
-        shipFromAddressJson: "{}",
-        shipToAddressJson: "{}",
+        shipFromAddressJson: JSON.stringify(toAddress),
+        shipToAddressJson: JSON.stringify(toAddress),
       });
-      res.json(shipment);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to generate label" });
+      
+      // Update order status to awaiting_device
+      await storage.updateSellOrder(orderId, { status: "awaiting_device" });
+      
+      // Send shipping label email
+      if (customerEmail) {
+        await sendShippingLabel(customerEmail, order.orderNumber, label.labelUrl);
+      }
+      
+      res.json({
+        ...shipment,
+        labelDownloadUrl: label.labelUrl,
+        labelPdfUrl: label.labelPdfUrl,
+      });
+    } catch (error: any) {
+      console.error("Shipment error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate label" });
     }
   });
 
-  // Get shipment info (label, tracking)
+  // Get shipment info (label, tracking) - PUBLIC for order confirmation page
+  app.get("/api/orders/:id/shipment", async (req, res) => {
+    try {
+      const orderId = req.params.id;
+      const shipment = await storage.getShipmentByOrder(orderId);
+      if (!shipment) return res.status(404).json({ error: "Shipment not found" });
+      res.json(shipment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shipment" });
+    }
+  });
+
+  // Get shipment info (label, tracking) - ADMIN
   app.get("/api/admin/orders/:id/shipment", requireAdmin, async (req, res) => {
     try {
       const orderId = req.params.id;
@@ -89,26 +625,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orderId = req.params.id;
       const shipment = await storage.getShipmentByOrder(orderId);
       if (!shipment) return res.status(404).json({ error: "Shipment not found" });
-      await storage.updateShipment(shipment.id, { labelUrl: null, trackingNumber: null, lastTrackingStatus: "voided" });
+      
+      // Void label with ShipEngine if we have label ID
+      if (shipment.labelUrl) {
+        try {
+          // Extract label ID from URL or use tracking number as fallback
+          const labelId = shipment.trackingNumber || shipment.id;
+          await voidLabel(labelId);
+        } catch (voidError) {
+          console.error("Error voiding label with ShipEngine:", voidError);
+          // Continue anyway to update local database
+        }
+      }
+      
+      await storage.updateShipment(shipment.id, { 
+        labelUrl: null, 
+        trackingNumber: null, 
+        lastTrackingStatus: "voided" 
+      });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to void label" });
     }
   });
 
-  // Refresh tracking status (placeholder)
+  // Refresh tracking status
   app.post("/api/admin/orders/:id/shipment/refresh", requireAdmin, async (req, res) => {
     try {
       const orderId = req.params.id;
       const shipment = await storage.getShipmentByOrder(orderId);
       if (!shipment) return res.status(404).json({ error: "Shipment not found" });
-      // TODO: Integrate with carrier API for real tracking
-      await storage.updateShipment(shipment.id, { lastTrackingStatus: "In Transit" });
-      res.json({ success: true, status: "In Transit" });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to refresh tracking" });
+      if (!shipment.trackingNumber) return res.status(400).json({ error: "No tracking number" });
+      
+      // Fetch tracking from ShipEngine
+      const trackingInfo = await trackShipment(
+        shipment.carrierName.toLowerCase(), 
+        shipment.trackingNumber
+      );
+      
+      // Update shipment with latest tracking status
+      await storage.updateShipment(shipment.id, {
+        lastTrackingStatus: trackingInfo.status_description || trackingInfo.status,
+      });
+      
+      res.json({ 
+        status: trackingInfo.status_description || trackingInfo.status,
+        trackingInfo 
+      });
+    } catch (error: any) {
+      console.error("Tracking refresh error:", error);
+      res.status(500).json({ error: error.message || "Failed to refresh tracking" });
     }
   });
+
+  // ==========================================================================
+  // IMEI CHECK ROUTES
+  // ==========================================================================
+  
+  // Check IMEI using PhoneCheck API
+  app.post("/api/imei/check", async (req, res) => {
+    try {
+      const { imei } = req.body;
+      
+      if (!imei) {
+        return res.status(400).json({ error: "IMEI is required" });
+      }
+      
+      // Validate IMEI format
+      if (!isValidIMEI(imei)) {
+        return res.status(400).json({ error: "Invalid IMEI format" });
+      }
+      
+      // Check IMEI with PhoneCheck
+      const result = await checkIMEI(imei);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("IMEI check error:", error);
+      res.status(500).json({ error: error.message || "Failed to check IMEI" });
+    }
+  });
+  
+  // Get device info from IMEI (quick lookup)
+  app.get("/api/imei/:imei/device", async (req, res) => {
+    try {
+      const imei = req.params.imei;
+      
+      if (!isValidIMEI(imei)) {
+        return res.status(400).json({ error: "Invalid IMEI format" });
+      }
+      
+      const deviceInfo = await getDeviceInfoFromIMEI(imei);
+      res.json(deviceInfo);
+    } catch (error: any) {
+      console.error("IMEI device info error:", error);
+      res.status(500).json({ error: error.message || "Failed to get device info" });
+    }
+  });
+
+  // ==========================================================================
+  // SITE SETTINGS ROUTES
+  // ==========================================================================
 
     app.get("/api/settings", async (req, res) => {
       try {
@@ -618,11 +1235,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      console.log("Creating order item with data:", JSON.stringify(validation.data, null, 2));
       const item = await storage.createSellOrderItem(validation.data);
       res.status(201).json(item);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating order item:", error);
-      res.status(500).json({ error: "Failed to create order item" });
+      console.error("Error details:", {
+        code: error.code,
+        message: error.message,
+        data: req.body
+      });
+      res.status(500).json({ 
+        error: "Failed to create order item",
+        details: error.message 
+      });
     }
   });
 
@@ -658,8 +1284,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate shipping label for a new order (public route)
+  app.post("/api/orders/:id/generate-label", async (req, res) => {
+    try {
+      const orderId = req.params.id;
+      const { name, email, phone, address, city, state, zipCode } = req.body;
+      
+      console.log("[Label Gen] Starting for order:", orderId);
+      
+      const order = await storage.getSellOrder(orderId);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      
+      // Build shipping address
+      const toAddress: any = {
+        name: name || email.split('@')[0],
+        address_line1: address,
+        city_locality: city,
+        state_province: stateNameToAbbr(state),
+        postal_code: zipCode,
+        country_code: 'US',
+        phone: phone || '',
+        email: email,
+      };
+      
+      console.log("[Label Gen] Calling ShipEngine with address:", toAddress.city_locality, toAddress.state_province);
+      
+      // Generate shipping label using ShipEngine
+      const label = await createShippingLabel(toAddress, order.orderNumber, {
+        weight: 16, // Default 1 lb for phones
+        serviceCode: 'usps_ground_advantage',
+      });
+      
+      console.log("[Label Gen] Label created:", { trackingNumber: label.trackingNumber, labelUrl: label.labelUrl?.substring(0, 50) });
+      
+      // Save shipment info
+      const shipment = await storage.createShipment({
+        sellOrderId: orderId,
+        carrierName: label.carrier,
+        serviceLevel: label.serviceCode,
+        trackingNumber: label.trackingNumber,
+        labelUrl: label.labelUrl,
+        labelCost: label.cost,
+        labelPaidBy: "company",
+        shipFromAddressJson: JSON.stringify(toAddress),
+        shipToAddressJson: JSON.stringify(toAddress),
+      });
+      
+      console.log("[Label Gen] Shipment saved:", shipment.id);
+      
+      // Update order with shipment ID and status
+      await storage.updateSellOrder(orderId, { 
+        shipmentId: shipment.id,
+        status: "awaiting_device" 
+      });
+      
+      console.log("[Label Gen] Order updated with shipment ID");
+      
+      // Send shipping label email
+      if (email) {
+        await sendShippingLabel(email, order.orderNumber, label.labelUrl);
+      }
+      
+      res.json({
+        ...shipment,
+        labelDownloadUrl: label.labelUrl,
+        labelPdfUrl: label.labelPdfUrl,
+      });
+    } catch (error: any) {
+      console.error("[Label Gen] Error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate label" });
+    }
+  });
+
   app.patch("/api/orders/:id", requireAuth, async (req, res) => {
     try {
+      const oldOrder = await storage.getSellOrder(req.params.id);
+      if (!oldOrder) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
       // Validate update data
       const updateSchema = insertSellOrderSchema.partial();
       const validation = updateSchema.safeParse(req.body);
@@ -675,6 +1378,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
       }
+      
+      // Send email notifications on status changes
+      if (req.body.status && req.body.status !== oldOrder.status) {
+        const emailMatch = order.notesCustomer?.match(/Email:\s*([^\s,]+)/);
+        const email = emailMatch ? emailMatch[1] : null;
+        
+        if (email) {
+          const items = await storage.getSellOrderItemsByOrder(order.id);
+          const firstItem = items[0];
+          let deviceName = 'Your device';
+          
+          if (firstItem) {
+            const model = await storage.getModel(firstItem.deviceModelId);
+            if (model) deviceName = model.name;
+          }
+          
+          switch (req.body.status) {
+            case 'received':
+              await sendDeviceReceived(email, order.orderNumber, deviceName);
+              break;
+            case 'payout_pending':
+              const payoutPendingAmount = order.totalFinalOffer || order.totalOriginalOffer;
+              const pendingAmount = typeof payoutPendingAmount === 'number' ? payoutPendingAmount : parseFloat(payoutPendingAmount || '0');
+              await sendInspectionComplete(email, order.orderNumber, pendingAmount, true);
+              break;
+            case 'completed':
+              if (order.payoutStatus === 'sent') {
+                const payoutAmount = order.totalFinalOffer || order.totalOriginalOffer;
+                const amount = typeof payoutAmount === 'number' ? payoutAmount : parseFloat(payoutAmount || '0');
+                await sendPaymentConfirmation(email, order.orderNumber, amount, order.payoutMethod || 'selected method');
+              }
+              break;
+            case 'reoffer_pending':
+            case 'customer_decision_pending':
+              if (order.totalFinalOffer) {
+                const finalOffer = typeof order.totalFinalOffer === 'number' ? order.totalFinalOffer : parseFloat(order.totalFinalOffer);
+                await sendInspectionComplete(email, order.orderNumber, finalOffer, false);
+              }
+              break;
+          }
+        }
+      }
+      
       res.json(order);
     } catch (error) {
       console.error("Error updating order:", error);
@@ -785,7 +1531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderNumber,
         userId,
         status: "label_pending",
-        totalOriginalOffer: pricingResult.finalOffer.toString(),
+        totalOriginalOffer: pricingResult.finalOffer,
         currency: pricingResult.currency,
       });
 
@@ -795,12 +1541,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deviceModelId: validation.data.deviceModelId,
         deviceVariantId: validation.data.deviceVariantId,
         claimedConditionProfileId: validation.data.conditionProfileId,
-        claimedIssuesJson: validation.data.claimedIssues,
-        originalOfferAmount: pricingResult.finalOffer.toString(),
+        claimedIssuesJson: JSON.stringify(validation.data.claimedIssues),
+        originalOfferAmount: pricingResult.finalOffer,
         pricingRuleId: pricingResult.pricingRuleId,
-        basePrice: pricingResult.basePrice.toString(),
-        totalPenalty: pricingResult.totalPenalty.toString(),
-        penaltyBreakdownJson: pricingResult.penalties,
+        basePrice: pricingResult.basePrice,
+        totalPenalty: pricingResult.totalPenalty,
+        penaltyBreakdownJson: JSON.stringify(pricingResult.penalties),
         imei: validation.data.imei,
         serialNumber: validation.data.serialNumber,
       });
@@ -994,7 +1740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  let upload;
+  let upload: any;
   // ESM-compatible dynamic import for multer
   async function getUploadMiddleware() {
     if (!upload) {
@@ -1006,7 +1752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/devices/import", requireAdmin, async (req, res, next) => {
     const upload = await getUploadMiddleware();
-    upload.single("xmlFile")(req, res, async (err) => {
+    upload.single("xmlFile")(req, res, async (err: any) => {
       if (err) return next(err);
       try {
         let xmlContent = req.body.xmlContent;
@@ -1082,7 +1828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   await storage.createPricingRule({
                     deviceVariantId: dbVariant.id,
                     conditionProfileId: conditionId,
-                    basePrice: price.price.toString(),
+                    basePrice: parseFloat(price.price.toString()),
                     currency: "USD",
                     isBlacklistedEligible: false,
                     isActive: true,

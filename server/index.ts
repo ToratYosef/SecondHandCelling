@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import SQLiteStore from "connect-sqlite3";
@@ -11,8 +12,8 @@ const Store = SQLiteStore(session);
 app.use(
   session({
     store: new Store({
-      db: process.env.DATABASE_URL || "sessions.db",
-      dir: ".",
+      db: "sessions.db",
+      dir: "./",
       clear_expired: true,
       checkExpirationInterval: 900000, // Check for expired sessions every 15 minutes
     }),

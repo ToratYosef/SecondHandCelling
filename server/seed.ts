@@ -1,14 +1,29 @@
 import { storage } from "./storage";
 import { hashPassword } from "./auth";
 import { db } from "./db";
-import { users, deviceBrands, deviceModels, deviceVariants, buybackConditionProfiles, buybackPricingRules } from "../shared/schema";
+import { 
+  users, 
+  deviceBrands, 
+  deviceModels, 
+  deviceVariants, 
+  buybackConditionProfiles, 
+  buybackPricingRules,
+  sellOrders,
+  sellOrderItems,
+  shipments,
+  payments
+} from "../shared/schema";
 
 async function seed() {
   console.log("Seeding database...");
 
   try {
-    // Clear existing data
+    // Clear existing data in correct order (children first)
     console.log("Clearing existing data...");
+    await db.delete(payments);
+    await db.delete(shipments);
+    await db.delete(sellOrderItems);
+    await db.delete(sellOrders);
     await db.delete(buybackPricingRules);
     await db.delete(deviceVariants);
     await db.delete(deviceModels);
@@ -174,7 +189,7 @@ async function seed() {
       await storage.createPricingRule({
         deviceVariantId: rule.variant.id,
         conditionProfileId: rule.condition.id,
-        basePrice: rule.price,
+        basePrice: parseFloat(rule.price),
         currency: "USD",
         isBlacklistedEligible: false,
         isActive: true,

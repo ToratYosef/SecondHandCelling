@@ -12,6 +12,8 @@ import {
   quoteLineItems,
   sellOrders,
   sellOrderItems,
+  shipments,
+  payments,
   type User,
   type InsertUser,
   type DeviceBrand,
