@@ -1,1 +1,3 @@
+# Ignore local Firebase service account keys
+firebase-to-neon/serviceAccountKey.json
 node_modules/
