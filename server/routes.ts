@@ -1321,6 +1321,35 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
     }
   });
 
+  // Public: Get order by number (limited fields)
+  app.get("/api/orders/by-number/:orderNumber", async (req, res) => {
+    try {
+      const order = await storage.getOrderByNumber(req.params.orderNumber);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      // Only expose minimal fields publicly
+      const items = await storage.getOrderItems(order.id);
+      const safeItems = items.map((i) => ({
+        deviceVariantId: i.deviceVariantId,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+      }));
+      res.json({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        total: order.total,
+        currency: order.currency,
+        createdAt: order.createdAt,
+        items: safeItems,
+      });
+    } catch (error: any) {
+      console.error("Public get order by number error:", error);
+      res.status(500).json({ error: "Failed to get order" });
+    }
+  });
+
   // ==================== STRIPE PAYMENT ROUTES ====================
   
   // Create payment intent
