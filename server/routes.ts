@@ -90,15 +90,38 @@ const selectPriceTierForQuantity = (tiers: any[], quantity: number) => {
 
 // Middleware to check if user is admin or super_admin
 const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  console.log('[requireAdmin] Session check:', {
+    hasSession: !!req.session,
+    userId: req.session?.userId,
+    userRole: req.session?.userRole,
+    sessionID: req.session?.id,
+    cookies: req.headers.cookie
+  });
+  
   if (!req.session.userId) {
-    return res.status(401).json({ error: "Authentication required" });
+    console.log('[requireAdmin] No userId in session - returning 401');
+    return res.status(401).json({ 
+      error: "Authentication required",
+      details: "No active session found. Please log in again."
+    });
   }
   
   const user = await storage.getUser(req.session.userId);
+  console.log('[requireAdmin] User lookup result:', {
+    found: !!user,
+    role: user?.role,
+    userId: user?.id
+  });
+  
   if (!user || (user.role !== "admin" && user.role !== "super_admin")) {
-    return res.status(403).json({ error: "Admin access required" });
+    console.log('[requireAdmin] User not admin - returning 403');
+    return res.status(403).json({ 
+      error: "Admin access required",
+      details: user ? `User role '${user.role}' is not authorized` : "User not found"
+    });
   }
   
+  console.log('[requireAdmin] Admin check passed for user:', user.email);
   next();
 };
 
@@ -109,6 +132,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const MemoryStore = createMemoryStore(session);
 
+  console.log('[Session Config]', {
+    isProduction,
+    cookieSecure: isProduction,
+    cookieSameSite: isProduction ? "none" : "lax",
+  });
+
   app.use(session({
     store: new MemoryStore({
       checkPeriod: 24 * 60 * 60 * 1000,
@@ -116,13 +145,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    name: 'shc.sid', // Custom session cookie name
     cookie: {
       secure: isProduction,
       httpOnly: true,
       sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+      domain: isProduction ? '.secondhandcell.com' : undefined, // Allow subdomain sharing
     },
   }));
+
+  // Debug middleware to log session info
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/admin') || req.path === '/api/auth/me') {
+      console.log('[Session Debug]', {
+        path: req.path,
+        method: req.method,
+        sessionID: req.session?.id,
+        userId: req.session?.userId,
+        userRole: req.session?.userRole,
+        hasCookie: !!req.headers.cookie,
+        cookieHeader: req.headers.cookie,
+        origin: req.headers.origin,
+        isProduction
+      });
+    }
+    next();
+  });
 
   // ==================== REGISTER MIGRATED ROUTES FROM FUNCTIONS FOLDER ====================
   
@@ -304,18 +354,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
+      console.log('[Login] Attempt for email:', email);
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
+        console.log('[Login] User not found:', email);
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const validPassword = await bcrypt.compare(password, user.passwordHash);
       if (!validPassword) {
+        console.log('[Login] Invalid password for user:', email);
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       if (!user.isActive) {
+        console.log('[Login] User account inactive:', email);
         return res.status(403).json({ error: "Account is inactive" });
       }
 
@@ -325,6 +379,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set session
       req.session.userId = user.id;
       req.session.userRole = user.role;
+      
+      console.log('[Login] Success:', {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        sessionID: req.session.id,
+        cookie: req.session.cookie
+      });
       
       res.json({ 
         success: true, 
@@ -436,15 +498,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get current user
+  // Get current user (without requireAuth to check session)
   const getMeHandler = async (req: any, res: any) => {
+    try {
+      console.log('[/api/auth/me] Session check:', {
+        hasSession: !!req.session,
+        sessionID: req.session?.id,
+        userId: req.session?.userId,
+        userRole: req.session?.userRole,
+        hasCookie: !!req.headers.cookie
+      });
+      
+      if (!req.session.userId) {
+        console.log('[/api/auth/me] No userId in session');
+        return res.status(401).json({ user: null, message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        console.log('[/api/auth/me] User not found for userId:', req.session.userId);
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      console.log('[/api/auth/me] User found:', { id: user.id, email: user.email, role: user.role });
+
+      // Get user's company
+      const companyUsers = await storage.getCompanyUsersByUserId(user.id);
+      let companyId = null;
+      if (companyUsers.length > 0) {
+        companyId = companyUsers[0].companyId;
+      }
+
+      res.json({
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone,
+          companyId,
+        }
+      });
+    } catch (error: any) {
+      console.error("Get user error:", error);
+      res.status(500).json({ error: "Failed to get user" });
+    }
+  };
+  
+  app.get("/api/auth/me", getMeHandler);
+  app.get("/api/me", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Get user's company
       const companyUsers = await storage.getCompanyUsersByUserId(user.id);
       let companyId = null;
       if (companyUsers.length > 0) {
@@ -463,10 +571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Get user error:", error);
       res.status(500).json({ error: "Failed to get user" });
     }
-  };
-  
-  app.get("/api/auth/me", requireAuth, getMeHandler);
-  app.get("/api/me", requireAuth, getMeHandler);
+  });
 
   // Get the company for the authenticated user
   app.get("/api/auth/company", requireAuth, async (req, res) => {
@@ -667,6 +772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/catalog/categories", getCategoriesHandler);
   app.get("/api/categories", getCategoriesHandler);
+  app.get("/api/device-categories", getCategoriesHandler);
 
   // Get brands (unique brands from device models)
   app.get("/api/brands", async (req, res) => {
@@ -782,6 +888,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Get models error:", error);
       res.status(500).json({ error: "Failed to get models" });
+    }
+  });
+
+  // Alias for frontend compatibility
+  app.get("/api/device-models", async (req, res) => {
+    try {
+      const { brandId } = req.query;
+      const models = await storage.getAllDeviceModels();
+      
+      // If no brandId, return all models
+      if (!brandId || typeof brandId !== 'string') {
+        const result = models.map(m => ({
+          id: m.id,
+          brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, '-')}`,
+          name: m.marketingName || m.name,
+          slug: m.slug,
+          year: null,
+        }));
+        return res.json(result);
+      }
+      
+      // Extract brand name from brandId
+      let brandName = '';
+      if (brandId.startsWith('brand-')) {
+        const brandPart = brandId.replace('brand-', '');
+        if (/^\d+$/.test(brandPart)) {
+          const brandsSet = new Set(models.map(m => m.brand));
+          const brandsArray = Array.from(brandsSet).sort();
+          const index = parseInt(brandPart, 10);
+          brandName = brandsArray[index] || '';
+        } else {
+          brandName = brandPart.charAt(0).toUpperCase() + brandPart.slice(1);
+        }
+      }
+      
+      if (!brandName) {
+        return res.json([]);
+      }
+      
+      const filteredModels = models.filter(m => 
+        m.brand.toLowerCase() === brandName.toLowerCase()
+      );
+      
+      const result = filteredModels.map(m => ({
+        id: m.id,
+        brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, '-')}`,
+        name: m.marketingName || m.name,
+        slug: m.slug,
+        year: null,
+      }));
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Get device-models error:", error);
+      res.status(500).json({ error: "Failed to get device models" });
     }
   });
 
@@ -941,9 +1102,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== ORDER ROUTES ====================
   
-  // Create order from cart
-  app.post("/api/orders", requireAuth, async (req, res) => {
+  // Create order (public endpoint - supports both authenticated cart checkout and guest orders)
+  app.post("/api/orders", async (req, res) => {
     try {
+      console.log('[POST /api/orders] Request body:', JSON.stringify(req.body, null, 2));
+      console.log('[POST /api/orders] Session userId:', req.session?.userId);
+      
+      const userId = req.session?.userId;
+      
+      // Guest order flow (sell page - selling devices TO the company)
+      if (!userId) {
+        const { 
+          customerInfo, 
+          devices, 
+          shippingAddress,
+          paymentMethod,
+          notes
+        } = req.body;
+        
+        console.log('[POST /api/orders] Guest order detected');
+        
+        // Validate guest order data
+        if (!customerInfo || !customerInfo.email) {
+          return res.status(400).json({ error: "Customer email is required" });
+        }
+        
+        if (!devices || !Array.isArray(devices) || devices.length === 0) {
+          return res.status(400).json({ error: "At least one device is required" });
+        }
+        
+        // Generate order number for guest (sell) orders
+        const orderNumber = `SL-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+        
+        // Calculate total
+        let total = 0;
+        devices.forEach((device: any) => {
+          total += parseFloat(device.price || device.amount || 0) * (device.quantity || 1);
+        });
+        
+        // Create a guest user or find existing by email
+        let guestUser = await storage.getUserByEmail(customerInfo.email);
+        if (!guestUser) {
+          // Create guest user
+          const randomPassword = Math.random().toString(36).slice(-8);
+          const passwordHash = await bcrypt.hash(randomPassword, 10);
+          
+          guestUser = await storage.createUser({
+            email: customerInfo.email,
+            name: customerInfo.name || customerInfo.email.split('@')[0],
+            passwordHash,
+            role: 'customer',
+            isActive: true,
+          });
+          
+          console.log('[POST /api/orders] Created guest user:', guestUser.id);
+        }
+        
+        // Get or create default company for guest orders
+        let guestCompany = await storage.getCompanyByName('Guest Orders');
+        if (!guestCompany) {
+          guestCompany = await storage.createCompany({
+            name: 'Guest Orders',
+            slug: 'guest-orders',
+            type: 'supplier',
+            isActive: true,
+          });
+        }
+        
+        // Store customer info in notes
+        const customerNotes = `Customer: ${customerInfo.name || 'N/A'}
+Email: ${customerInfo.email}
+Phone: ${customerInfo.phone || 'N/A'}
+${shippingAddress ? `Address: ${JSON.stringify(shippingAddress)}` : ''}
+${notes ? `\nNotes: ${notes}` : ''}`;
+        
+        // Create order
+        const order = await storage.createOrder({
+          orderNumber,
+          companyId: guestCompany.id,
+          createdByUserId: guestUser.id,
+          status: 'pending_payment',
+          subtotal: total.toFixed(2),
+          shippingCost: '0',
+          taxAmount: '0',
+          discountAmount: '0',
+          total: total.toFixed(2),
+          currency: 'USD',
+          paymentStatus: 'pending',
+          paymentMethod: paymentMethod || 'check',
+          shippingAddressId: null,
+          billingAddressId: null,
+          notesCustomer: customerNotes,
+        });
+        
+        console.log('[POST /api/orders] Guest order created:', order.id, orderNumber);
+        
+        res.json({ 
+          success: true,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          message: 'Order submitted successfully'
+        });
+        return;
+      }
+      
+      // Authenticated user flow (cart checkout - buying devices FROM the company)
       const { paymentMethod, shippingAddressId, billingAddressId, notes } = req.body;
 
       // Validate required fields
@@ -960,7 +1223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(503).json({ error: "Card payment is not available. Please select another payment method." });
       }
 
-      const cart = await storage.getCartByUserId(req.session.userId!);
+      const cart = await storage.getCartByUserId(userId);
       if (!cart) {
         return res.status(400).json({ error: "Cart not found" });
       }
@@ -987,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const order = await storage.createOrder({
         orderNumber,
         companyId: cart.companyId,
-        createdByUserId: req.session.userId!,
+        createdByUserId: userId,
         status: "pending_payment",
         subtotal: subtotal.toFixed(2),
         shippingCost: shippingCost.toFixed(2),
@@ -1833,64 +2096,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Quick stats for admin sidebar
-  app.get("/api/admin/quick-stats", requireAdmin, async (req, res) => {
-    try {
-      const allOrders = await storage.getAllOrders();
-      const pendingOrders = allOrders.filter((o) => o.status === "pending").length;
-      const processingOrders = allOrders.filter((o) => o.status === "processing").length;
-      const totalRevenue = allOrders
-        .filter((o) => o.status === "completed")
-        .reduce((sum, o) => sum + Number(o.total || 0), 0);
-      const allCompanies = await storage.getAllCompanies();
-      const totalCompanies = allCompanies.length;
-
-      res.json({
-        pendingOrders,
-        processingOrders,
-        totalRevenue,
-        totalCompanies,
-      });
-    } catch (error: any) {
-      console.error("Get quick stats error:", error);
-      res.status(500).json({ error: "Failed to get quick stats" });
-    }
-  });
-
-  // Dashboard stats for admin dashboard
-  app.get("/api/admin/dashboard-stats", requireAdmin, async (req, res) => {
-    try {
-      const allOrders = await storage.getAllOrders();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayOrders = allOrders.filter((o) => {
-        const orderDate = new Date(o.createdAt);
-        orderDate.setHours(0, 0, 0, 0);
-        return orderDate.getTime() === today.getTime();
-      }).length;
-      const pendingOrders = allOrders.filter((o) => o.status === "pending").length;
-      const completedOrders = allOrders.filter((o) => o.status === "completed").length;
-      const totalOrders = allOrders.length;
-      const totalRevenue = allOrders
-        .filter((o) => o.status === "completed")
-        .reduce((sum, o) => sum + Number(o.total || 0), 0);
-      const allCompanies = await storage.getAllCompanies();
-      const totalCompanies = allCompanies.length;
-
-      res.json({
-        todayOrders,
-        pendingOrders,
-        completedOrders,
-        totalOrders,
-        totalRevenue,
-        totalCompanies,
-      });
-    } catch (error: any) {
-      console.error("Get dashboard stats error:", error);
-      res.status(500).json({ error: "Failed to get dashboard stats" });
-    }
-  });
-
   // Stream orders as CSV (admin only)
   app.get("/api/admin/export/orders.csv", requireAdmin, async (req, res) => {
     try {
@@ -2406,6 +2611,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Create ticket error:", error);
       res.status(500).json({ error: "Failed to create ticket" });
+    }
+  });
+
+  // ==================== ADMIN ENDPOINTS ====================
+  
+  // Admin dashboard stats
+  app.get("/api/admin/dashboard-stats", requireAdmin, async (req, res) => {
+    try {
+      const { eq, and, sql } = await import("drizzle-orm");
+      
+      // Get all orders to calculate stats
+      const allOrders = await db.select().from(schema.orders);
+      
+      // Calculate total revenue
+      const totalRevenue = allOrders.reduce((sum, order) => {
+        return sum + parseFloat(order.totalAmount || "0");
+      }, 0);
+      
+      // Count orders by status
+      const totalOrders = allOrders.length;
+      const pendingOrders = allOrders.filter(o => 
+        o.status === "pending_approval" || 
+        o.status === "approved" || 
+        o.status === "processing"
+      ).length;
+      const completedOrders = allOrders.filter(o => o.status === "completed").length;
+      
+      // Get company stats
+      const allCompanies = await db.select().from(schema.companies);
+      const totalCompanies = allCompanies.length;
+      const activeCompanies = allCompanies.filter(c => c.status === "active").length;
+      
+      // Get user stats
+      const allUsers = await db.select().from(schema.users);
+      const totalUsers = allUsers.length;
+      const activeUsers = allUsers.filter(u => u.isActive).length;
+      
+      res.json({
+        totalRevenue,
+        totalOrders,
+        pendingOrders,
+        completedOrders,
+        totalCompanies,
+        activeCompanies,
+        totalUsers,
+        activeUsers,
+      });
+    } catch (error: any) {
+      console.error("Dashboard stats error:", error);
+      res.status(500).json({ error: "Failed to get dashboard stats" });
+    }
+  });
+
+  // Admin quick stats
+  app.get("/api/admin/quick-stats", requireAdmin, async (req, res) => {
+    try {
+      const { gte, and } = await import("drizzle-orm");
+      
+      // Get orders from today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const allOrders = await db.select().from(schema.orders);
+      
+      const ordersToday = allOrders.filter(o => {
+        const orderDate = new Date(o.createdAt);
+        return orderDate >= today;
+      }).length;
+      
+      // Get orders from this month
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const ordersThisMonth = allOrders.filter(o => {
+        const orderDate = new Date(o.createdAt);
+        return orderDate >= firstDayOfMonth;
+      }).length;
+      
+      // Calculate revenue for today and this month
+      const revenueToday = allOrders
+        .filter(o => new Date(o.createdAt) >= today)
+        .reduce((sum, o) => sum + parseFloat(o.totalAmount || "0"), 0);
+      
+      const revenueThisMonth = allOrders
+        .filter(o => new Date(o.createdAt) >= firstDayOfMonth)
+        .reduce((sum, o) => sum + parseFloat(o.totalAmount || "0"), 0);
+      
+      // Get pending approvals
+      const pendingApprovals = allOrders.filter(o => o.status === "pending_approval").length;
+      
+      res.json({
+        ordersToday,
+        ordersThisMonth,
+        revenueToday,
+        revenueThisMonth,
+        pendingApprovals,
+      });
+    } catch (error: any) {
+      console.error("Quick stats error:", error);
+      res.status(500).json({ error: "Failed to get quick stats" });
+    }
+  });
+
+  // ONE-TIME SETUP: Create super admin (remove after first use)
+  app.post("/api/setup-admin", async (req, res) => {
+    try {
+      const { setupKey } = req.body;
+      
+      // Secret key to prevent unauthorized admin creation
+      if (setupKey !== process.env.SETUP_ADMIN_KEY && setupKey !== "shc-setup-2024") {
+        return res.status(403).json({ error: "Invalid setup key" });
+      }
+
+      // Check if admin already exists
+      const existingAdmin = await storage.getUserByEmail("admin@secondhandcell.com");
+      if (existingAdmin) {
+        return res.json({ message: "Admin already exists", email: "admin@secondhandcell.com" });
+      }
+
+      // Create admin user
+      const adminPassword = await bcrypt.hash("Admin123!", 10);
+      const adminUser = await storage.createUser({
+        name: "Admin User",
+        email: "admin@secondhandcell.com",
+        passwordHash: adminPassword,
+        role: "super_admin",
+        phone: "+1-555-0100",
+        isActive: true,
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Admin created successfully",
+        email: "admin@secondhandcell.com",
+        password: "Admin123!",
+        userId: adminUser.id
+      });
+    } catch (error: any) {
+      console.error("Setup admin error:", error);
+      res.status(500).json({ error: "Failed to create admin: " + error.message });
     }
   });
 
