@@ -216,20 +216,23 @@ export default function Sell() {
     }
     // Build order payload for backend schema
     const orderPayload = {
-      customerEmail: shippingEmail,
-      customerPhone: phone,
-      shippingAddressLine1: address,
-      shippingCity: city,
-      shippingState: state,
-      shippingPostalCode: zipCode,
-      shippingCountry: "US",
-      payoutMethod: paymentMethod,
-      payoutDetailsJson: JSON.stringify({ username: paymentUsername }),
-      totalOriginalOffer: calculatedOffer,
-      currency: "USD",
-      notesCustomer: `Shipping: ${shippingOption}`,
+      customer: {
+        email: shippingEmail,
+        phone,
+        companyName: null,
+        website: null,
+      },
+      items: [
+        {
+          deviceModelId: selectedModel,
+          deviceVariantId: null,
+          quantity: 1,
+          unitPrice: calculatedOffer,
+        },
+      ],
+      notes: `Shipping: ${shippingOption}; payout: ${paymentMethod}; username: ${paymentUsername}`,
     };
-    fetch(getApiUrl("/api/orders"), {
+    fetch(getApiUrl("/api/submit-order"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(orderPayload),
@@ -237,40 +240,12 @@ export default function Sell() {
       .then(async (res) => {
         if (!res.ok) {
           const err = await res.json();
-          throw new Error(err.details || err.error || "Failed to create order");
+          throw new Error(err.details || err.error || "Failed to submit order");
         }
-        const order = await res.json();
-        // Create order item
-        // Use the first condition profile (typically "Good" or default condition)
-        const conditionId = conditions && conditions.length > 0 ? conditions[0].id : null;
-        
-        if (!conditionId) {
-          throw new Error("No condition profiles available");
-        }
-        
-        const itemPayload = {
-          deviceModelId: selectedModel,
-          deviceVariantId: null, // Optional - will be null if no specific variant selected
-          claimedConditionProfileId: conditionId,
-          originalOfferAmount: calculatedOffer,
-        };
-        await fetch(getApiUrl(`/api/orders/${order.id}/items`), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(itemPayload),
-        });
-
-        // Generate shipping label if they chose email label
-        if (shippingOption === "label") {
-          await fetch(getApiUrl(`/api/orders/${order.id}/generate-label`), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
+        const result = await res.json();
         setShowPaymentDialog(false);
         // Redirect to success page
-        setLocation(`/success?order=${order.orderNumber}`);
+        setLocation(`/success?order=${result.orderNumber}`);
       })
       .catch((err) => {
         console.error("Order submission failed:", err);

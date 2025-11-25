@@ -92,55 +92,21 @@ export function InstantQuoteWidget() {
         throw new Error("Condition profile not found");
       }
       
-      // Create order
-      const orderPayload = {
-        payoutMethod: paymentMethod,
-        payoutDetailsJson: JSON.stringify({ username: paymentUsername }),
-        totalOriginalOffer: calculatedPrice,
-        currency: "USD",
-        notesCustomer: `Name: ${name}, Email: ${email}, Phone: ${phone}, Address: ${address}, ${city}, ${state}, ${zipCode}`,
+      // Submit guest order via public endpoint
+      const submitPayload = {
+        customer: { email, phone, companyName: null, website: null },
+        items: [ { deviceModelId: selectedModel, deviceVariantId: null, quantity: 1, unitPrice: calculatedPrice } ],
+        notes: `Address: ${address}, ${city}, ${state}, ${zipCode}; payout: ${paymentMethod}; username: ${paymentUsername}`,
       };
-      
-      const orderRes = await fetch(getApiUrl("/api/orders"), {
+      const submitRes = await fetch(getApiUrl("/api/submit-order"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload),
+        body: JSON.stringify(submitPayload),
       });
-      
-      if (!orderRes.ok) throw new Error("Failed to create order");
-      const order = await orderRes.json();
-      
-      // Create order item
-      const itemPayload = {
-        deviceModelId: selectedModel,
-        deviceVariantId: null,
-        claimedConditionProfileId: conditionProfile.id,
-        originalOfferAmount: calculatedPrice,
-      };
-      
-      await fetch(getApiUrl(`/api/orders/${order.id}/items`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(itemPayload),
-      });
-      
-      // Generate shipping label immediately
-      await fetch(getApiUrl(`/api/orders/${order.id}/generate-label`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          email,
-          phone,
-          address,
-          city,
-          state,
-          zipCode,
-        }),
-      });
-      
+      if (!submitRes.ok) throw new Error("Failed to submit order");
+      const result = await submitRes.json();
       // Redirect to success page
-      setLocation(`/success?order=${order.orderNumber}`);
+      setLocation(`/success?order=${result.orderNumber}`);
     } catch (error) {
       console.error("Order submission failed:", error);
       alert("Failed to submit order. Please try again.");
