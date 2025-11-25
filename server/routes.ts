@@ -1833,6 +1833,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quick stats for admin sidebar
+  app.get("/api/admin/quick-stats", requireAdmin, async (req, res) => {
+    try {
+      const allOrders = await storage.getAllOrders();
+      const pendingOrders = allOrders.filter((o) => o.status === "pending").length;
+      const processingOrders = allOrders.filter((o) => o.status === "processing").length;
+      const totalRevenue = allOrders
+        .filter((o) => o.status === "completed")
+        .reduce((sum, o) => sum + Number(o.total || 0), 0);
+      const allCompanies = await storage.getAllCompanies();
+      const totalCompanies = allCompanies.length;
+
+      res.json({
+        pendingOrders,
+        processingOrders,
+        totalRevenue,
+        totalCompanies,
+      });
+    } catch (error: any) {
+      console.error("Get quick stats error:", error);
+      res.status(500).json({ error: "Failed to get quick stats" });
+    }
+  });
+
+  // Dashboard stats for admin dashboard
+  app.get("/api/admin/dashboard-stats", requireAdmin, async (req, res) => {
+    try {
+      const allOrders = await storage.getAllOrders();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayOrders = allOrders.filter((o) => {
+        const orderDate = new Date(o.createdAt);
+        orderDate.setHours(0, 0, 0, 0);
+        return orderDate.getTime() === today.getTime();
+      }).length;
+      const pendingOrders = allOrders.filter((o) => o.status === "pending").length;
+      const completedOrders = allOrders.filter((o) => o.status === "completed").length;
+      const totalOrders = allOrders.length;
+      const totalRevenue = allOrders
+        .filter((o) => o.status === "completed")
+        .reduce((sum, o) => sum + Number(o.total || 0), 0);
+      const allCompanies = await storage.getAllCompanies();
+      const totalCompanies = allCompanies.length;
+
+      res.json({
+        todayOrders,
+        pendingOrders,
+        completedOrders,
+        totalOrders,
+        totalRevenue,
+        totalCompanies,
+      });
+    } catch (error: any) {
+      console.error("Get dashboard stats error:", error);
+      res.status(500).json({ error: "Failed to get dashboard stats" });
+    }
+  });
+
   // Stream orders as CSV (admin only)
   app.get("/api/admin/export/orders.csv", requireAdmin, async (req, res) => {
     try {
