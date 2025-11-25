@@ -82,19 +82,9 @@ export default function Sell() {
     queryFn: async () => {
       if (!selectedBrand) return [];
       
-      // Extract slug from selectedBrand (e.g., "brand-0" -> find slug, or "brand-apple" -> "apple")
-      const selectedBrandData = brands.find(b => b.id === selectedBrand);
-      const brandSlug = selectedBrandData?.slug || selectedBrand.replace('brand-', '');
-      
-      // Use RESTful route: /api/brands/{slug}/models
-      const res = await fetch(getApiUrl(`/api/brands/${brandSlug}/models`));
-      if (!res.ok) {
-        // Fallback to query param if RESTful route fails
-        const fallbackRes = await fetch(getApiUrl(`/api/models?brandId=${selectedBrand}`));
-        if (!fallbackRes.ok) throw new Error("Failed to load models");
-        const data = await fallbackRes.json();
-        return Array.isArray(data) ? data : [];
-      }
+      // Use query param route for now (will switch to RESTful after backend deployment)
+      const res = await fetch(getApiUrl(`/api/models?brandId=${selectedBrand}`));
+      if (!res.ok) throw new Error("Failed to load models");
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
