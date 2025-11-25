@@ -18,6 +18,7 @@ import { AlertCircle, Check, Smartphone } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { getApiUrl } from "@/lib/api";
 
 type DeviceBrand = {
   id: string;
@@ -69,7 +70,7 @@ export default function Sell() {
   const { data: brands = [] } = useQuery<DeviceBrand[]>({
     queryKey: ["/api/brands"],
     queryFn: async () => {
-      const res = await fetch("/api/brands");
+      const res = await fetch(getApiUrl("/api/brands"));
       if (!res.ok) throw new Error("Failed to load brands");
       return res.json();
     },
@@ -78,7 +79,7 @@ export default function Sell() {
   const { data: models = [] } = useQuery<DeviceModel[]>({
     queryKey: ["/api/models", "by-brand", selectedBrand],
     queryFn: async () => {
-      const res = await fetch(`/api/models?brandId=${selectedBrand}`);
+      const res = await fetch(getApiUrl(`/api/models?brandId=${selectedBrand}`));
       if (!res.ok) throw new Error("Failed to load models");
       return res.json();
     },
@@ -88,7 +89,7 @@ export default function Sell() {
   const { data: conditions = [] } = useQuery<any[]>({
     queryKey: ["/api/conditions"],
     queryFn: async () => {
-      const res = await fetch("/api/conditions");
+      const res = await fetch(getApiUrl("/api/conditions"));
       if (!res.ok) throw new Error("Failed to load conditions");
       return res.json();
     },
@@ -222,7 +223,7 @@ export default function Sell() {
       currency: "USD",
       notesCustomer: `Shipping: ${shippingOption}`,
     };
-    fetch("/api/orders", {
+    fetch(getApiUrl("/api/orders"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(orderPayload),
@@ -247,7 +248,7 @@ export default function Sell() {
           claimedConditionProfileId: conditionId,
           originalOfferAmount: calculatedOffer,
         };
-        await fetch(`/api/orders/${order.id}/items`, {
+        await fetch(getApiUrl(`/api/orders/${order.id}/items`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(itemPayload),
@@ -255,7 +256,7 @@ export default function Sell() {
 
         // Generate shipping label if they chose email label
         if (shippingOption === "label") {
-          await fetch(`/api/orders/${order.id}/generate-label`, {
+          await fetch(getApiUrl(`/api/orders/${order.id}/generate-label`), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
           });

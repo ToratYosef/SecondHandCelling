@@ -3,6 +3,7 @@ import { AdminSidebar } from "@/components/AdminSidebar";
 import { AdminProtected } from "@/components/AdminProtected";
 import { Card } from "@/components/ui/card";
 import { FileText, Package, DollarSign, AlertCircle, TrendingUp, Users, Smartphone } from "lucide-react";
+import { getApiUrl } from "@/lib/api";
 
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<any>({
@@ -16,7 +17,7 @@ export default function AdminDashboard() {
   const [agingOrders, setAgingOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    fetch("/api/admin/analytics")
+    fetch(getApiUrl("/api/admin/analytics"))
       .then(res => res.json())
       .then(data => {
         setMetrics(data.metrics || {});

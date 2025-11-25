@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lock } from "lucide-react";
+import { getApiUrl } from "@/lib/api";
 
 interface AdminProtectedProps {
   children: ReactNode;
@@ -17,7 +18,7 @@ export function AdminProtected({ children }: AdminProtectedProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("/api/auth/me", {
+        const response = await fetch(getApiUrl("/api/auth/me"), {
           credentials: "include",
         });
 

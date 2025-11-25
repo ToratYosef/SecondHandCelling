@@ -12,6 +12,7 @@ import { Link, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getApiUrl } from "@/lib/api";
 
 type DeviceModel = {
   id: string;
@@ -72,7 +73,7 @@ export default function QuoteBuilder() {
   const { data: model, isLoading: modelLoading } = useQuery<DeviceModel>({
     queryKey: ["/api/models", slug],
     queryFn: async () => {
-      const res = await fetch(`/api/models/${slug}`);
+      const res = await fetch(getApiUrl(`/api/models/${slug}`));
       if (!res.ok) throw new Error("Failed to load device");
       return res.json();
     },
@@ -83,7 +84,7 @@ export default function QuoteBuilder() {
   const { data: variants = [], isLoading: variantsLoading } = useQuery<DeviceVariant[]>({
     queryKey: ["/api/models", model?.id, "variants"],
     queryFn: async () => {
-      const res = await fetch(`/api/models/${model?.id}/variants`);
+      const res = await fetch(getApiUrl(`/api/models/${model?.id}/variants`));
       if (!res.ok) throw new Error("Failed to load variants");
       return res.json();
     },
@@ -94,7 +95,7 @@ export default function QuoteBuilder() {
   const { data: conditions = [], isLoading: conditionsLoading } = useQuery<ConditionProfile[]>({
     queryKey: ["/api/conditions"],
     queryFn: async () => {
-      const res = await fetch("/api/conditions");
+      const res = await fetch(getApiUrl("/api/conditions"));
       if (!res.ok) throw new Error("Failed to load conditions");
       return res.json();
     },

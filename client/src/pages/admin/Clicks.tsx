@@ -5,6 +5,7 @@ import { AdminProtected } from "../../components/AdminProtected";
 import { LoadingSpinner, EmptyState, ErrorState } from "../../components/AdminUtilities";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
+import { getApiUrl } from "@/lib/api";
 
 export default function AdminClicks() {
   const [deviceFamily, setDeviceFamily] = useState("all");
@@ -19,7 +20,7 @@ export default function AdminClicks() {
         range: dateRange,
         sortBy,
       });
-      const res = await fetch(`/api/admin/clicks?${params}`);
+      const res = await fetch(getApiUrl(`/api/admin/clicks?${params}`));
       if (!res.ok) throw new Error("Failed to fetch clicks data");
       return res.json();
     },

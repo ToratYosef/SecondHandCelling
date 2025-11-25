@@ -7,6 +7,7 @@ import { useToast } from "../../components/AdminToast";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Link } from "wouter";
+import { getApiUrl } from "@/lib/api";
 
 interface AgingOrder {
   id: string;
@@ -28,7 +29,7 @@ export default function AdminAging() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["admin-aging"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/analytics");
+      const res = await fetch(getApiUrl("/api/admin/analytics"));
       if (!res.ok) throw new Error("Failed to fetch aging data");
       return res.json();
     },

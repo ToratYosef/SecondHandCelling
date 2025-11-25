@@ -6,6 +6,7 @@ import { LoadingSpinner, EmptyState, ErrorState } from "../../components/AdminUt
 import { useToast } from "../../components/AdminToast";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
+import { getApiUrl } from "@/lib/api";
 
 export default function AdminPrintQueue() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
@@ -15,7 +16,7 @@ export default function AdminPrintQueue() {
   const { data: orders, isLoading, error, refetch } = useQuery({
     queryKey: ["admin-print-queue"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/orders/needs-printing");
+      const res = await fetch(getApiUrl("/api/admin/orders/needs-printing"));
       if (!res.ok) throw new Error("Failed to fetch print queue");
       return res.json();
     },
@@ -23,7 +24,7 @@ export default function AdminPrintQueue() {
 
   const createBundleMutation = useMutation({
     mutationFn: async (orderIds: string[]) => {
-      const res = await fetch("/api/admin/orders/needs-printing/bundle", {
+      const res = await fetch(getApiUrl("/api/admin/orders/needs-printing/bundle"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderIds }),
@@ -48,7 +49,7 @@ export default function AdminPrintQueue() {
     mutationFn: async (orderIds: string[]) => {
       await Promise.all(
         orderIds.map((id) =>
-          fetch(`/api/admin/orders/${id}/mark-kit-sent`, { method: "POST" })
+          fetch(getApiUrl(`/api/admin/orders/${id}/mark-kit-sent`), { method: "POST" })
         )
       );
     },
@@ -64,7 +65,7 @@ export default function AdminPrintQueue() {
 
   const generateLabelMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      const res = await fetch(`/api/admin/orders/${orderId}/shipment`, {
+      const res = await fetch(getApiUrl(`/api/admin/orders/${orderId}/shipment`), {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to generate label");

@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getApiUrl } from "@/lib/api";
 
 type SellOrderWithItems = {
   id: string;
@@ -154,7 +155,7 @@ export default function AdminOrders() {
                       // Bulk status update example
                       const newStatus = prompt("Set status for selected orders:", "completed");
                       if (newStatus) {
-                        await Promise.all(selectedIds.map(id => fetch(`/api/admin/orders/${id}`, {
+                        await Promise.all(selectedIds.map(id => fetch(getApiUrl(`/api/admin/orders/${id}`), {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ status: newStatus }),
@@ -348,7 +349,7 @@ export default function AdminOrders() {
                             value={selectedOrder.status}
                             onChange={async e => {
                               const newStatus = e.target.value;
-                              await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                              await fetch(getApiUrl(`/api/admin/orders/${selectedOrder.id}`), {
                                 method: "PATCH",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ status: newStatus }),
@@ -380,7 +381,7 @@ export default function AdminOrders() {
                                 <Button 
                                   className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                                   onClick={async () => {
-                                    const res = await fetch(`/api/admin/orders/${selectedOrder.id}/shipment`, { method: "POST" });
+                                    const res = await fetch(getApiUrl(`/api/admin/orders/${selectedOrder.id}/shipment`), { method: "POST" });
                                     if (res.ok) {
                                       const shipment = await res.json();
                                       alert(`Label generated!\nTracking: ${shipment.trackingNumber}`);
@@ -399,7 +400,7 @@ export default function AdminOrders() {
                                     variant="outline" 
                                     className="w-full"
                                     onClick={async () => {
-                                      const res = await fetch(`/api/admin/orders/${selectedOrder.id}/shipment`);
+                                      const res = await fetch(getApiUrl(`/api/admin/orders/${selectedOrder.id}/shipment`));
                                       if (res.ok) {
                                         const shipment = await res.json();
                                         if (shipment.labelUrl) window.open(shipment.labelUrl, "_blank");
@@ -413,7 +414,7 @@ export default function AdminOrders() {
                                     variant="outline" 
                                     className="w-full"
                                     onClick={async () => {
-                                      const res = await fetch(`/api/admin/orders/${selectedOrder.id}/shipment/refresh`, { method: "POST" });
+                                      const res = await fetch(getApiUrl(`/api/admin/orders/${selectedOrder.id}/shipment/refresh`), { method: "POST" });
                                       if (res.ok) {
                                         const data = await res.json();
                                         alert(`Tracking status: ${data.status}`);
@@ -429,7 +430,7 @@ export default function AdminOrders() {
                                       className="w-full"
                                       onClick={async () => {
                                         if (confirm("Void this shipping label?")) {
-                                          const res = await fetch(`/api/admin/orders/${selectedOrder.id}/shipment/void`, { method: "POST" });
+                                          const res = await fetch(getApiUrl(`/api/admin/orders/${selectedOrder.id}/shipment/void`), { method: "POST" });
                                           if (res.ok) alert("Label voided.");
                                         }
                                       }}
@@ -467,7 +468,7 @@ export default function AdminOrders() {
                                 className="w-full border-red-300 text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
                                 onClick={async () => {
                                   if (confirm("Cancel this order?")) {
-                                    await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                                    await fetch(getApiUrl(`/api/admin/orders/${selectedOrder.id}`), {
                                       method: "PATCH",
                                       headers: { "Content-Type": "application/json" },
                                       body: JSON.stringify({ status: "cancelled" }),
@@ -485,7 +486,7 @@ export default function AdminOrders() {
                               className="w-full"
                               onClick={async () => {
                                 if (confirm("Delete this order permanently? This cannot be undone!")) {
-                                  await fetch(`/api/admin/orders/${selectedOrder.id}`, { method: "DELETE" });
+                                  await fetch(getApiUrl(`/api/admin/orders/${selectedOrder.id}`), { method: "DELETE" });
                                   alert("Order deleted.");
                                   setShowModal(false);
                                 }

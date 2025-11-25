@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getApiUrl } from "@/lib/api";
 
 export default function AdminSettings() {
   const { toast } = useToast();
@@ -22,7 +23,7 @@ export default function AdminSettings() {
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (form: FormData) => {
-      const res = await fetch("/api/admin/settings", {
+      const res = await fetch(getApiUrl("/api/admin/settings"), {
         method: "POST",
         body: form,
         credentials: "include",

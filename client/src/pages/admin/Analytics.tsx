@@ -20,6 +20,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { getApiUrl } from "@/lib/api";
 
 export default function AdminAnalytics() {
   const [dateRange, setDateRange] = useState("month");
@@ -28,7 +29,7 @@ export default function AdminAnalytics() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["admin-analytics-full", dateRange],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/analytics/full?range=${dateRange}`);
+      const res = await fetch(getApiUrl(`/api/admin/analytics/full?range=${dateRange}`));
       if (!res.ok) throw new Error("Failed to fetch analytics");
       return res.json();
     },

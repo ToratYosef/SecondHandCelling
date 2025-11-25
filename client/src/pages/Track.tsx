@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Package, CheckCircle, Clock, Truck, DollarSign, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { getApiUrl } from "@/lib/api";
 
 export default function Track() {
   const [orderNumber, setOrderNumber] = useState("");
@@ -17,7 +18,7 @@ export default function Track() {
   const { data: order, isLoading, error } = useQuery({
     queryKey: ["/api/orders/by-number", searchParams.orderNumber],
     queryFn: async () => {
-      const res = await fetch(`/api/orders/by-number/${searchParams.orderNumber}`);
+      const res = await fetch(getApiUrl(`/api/orders/by-number/${searchParams.orderNumber}`));
       if (!res.ok) throw new Error("Order not found");
       return res.json();
     },

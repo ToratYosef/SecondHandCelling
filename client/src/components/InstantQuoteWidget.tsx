@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
+import { getApiUrl } from "@/lib/api";
 
 export function InstantQuoteWidget() {
   const [, setLocation] = useLocation();
@@ -44,7 +45,7 @@ export function InstantQuoteWidget() {
     queryKey: ["/api/models", selectedBrand],
     queryFn: async () => {
       if (!selectedBrand) return [];
-      const res = await fetch(`/api/models?brandId=${selectedBrand}`);
+      const res = await fetch(getApiUrl(`/api/models?brandId=${selectedBrand}`));
       if (!res.ok) throw new Error("Failed to fetch models");
       return res.json();
     },
@@ -100,7 +101,7 @@ export function InstantQuoteWidget() {
         notesCustomer: `Name: ${name}, Email: ${email}, Phone: ${phone}, Address: ${address}, ${city}, ${state}, ${zipCode}`,
       };
       
-      const orderRes = await fetch("/api/orders", {
+      const orderRes = await fetch(getApiUrl("/api/orders"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderPayload),
@@ -117,14 +118,14 @@ export function InstantQuoteWidget() {
         originalOfferAmount: calculatedPrice,
       };
       
-      await fetch(`/api/orders/${order.id}/items`, {
+      await fetch(getApiUrl(`/api/orders/${order.id}/items`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(itemPayload),
       });
       
       // Generate shipping label immediately
-      await fetch(`/api/orders/${order.id}/generate-label`, {
+      await fetch(getApiUrl(`/api/orders/${order.id}/generate-label`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

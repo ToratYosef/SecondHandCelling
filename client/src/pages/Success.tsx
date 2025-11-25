@@ -6,6 +6,7 @@ import { Check, Download, Package } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 
 export default function Success() {
   const [, setLocation] = useLocation();
@@ -17,7 +18,7 @@ export default function Success() {
     queryKey: ['/api/orders/by-number', orderNumber],
     queryFn: async () => {
       if (!orderNumber) throw new Error('No order number');
-      const res = await fetch(`/api/orders/by-number/${orderNumber}`);
+      const res = await fetch(getApiUrl(`/api/orders/by-number/${orderNumber}`));
       if (!res.ok) throw new Error('Failed to fetch order');
       return res.json();
     },
@@ -29,7 +30,7 @@ export default function Success() {
     queryKey: ['/api/orders', order?.id, 'shipment'],
     queryFn: async () => {
       if (!order?.id) return null;
-      const res = await fetch(`/api/orders/${order.id}/shipment`);
+      const res = await fetch(getApiUrl(`/api/orders/${order.id}/shipment`));
       if (!res.ok) return null;
       return res.json();
     },

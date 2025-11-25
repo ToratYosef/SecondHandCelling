@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState } from "react";
+import { getApiUrl } from "@/lib/api";
 
 type DeviceBrand = {
   id: string;
@@ -149,7 +150,7 @@ export default function AdminDevices() {
       } else if (xmlContent) {
         formData.append("xmlContent", xmlContent);
       }
-      const response = await fetch("/api/admin/devices/import", {
+      const response = await fetch(getApiUrl("/api/admin/devices/import"), {
         method: "POST",
         body: formData,
         credentials: "include",

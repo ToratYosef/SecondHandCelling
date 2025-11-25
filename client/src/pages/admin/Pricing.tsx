@@ -25,6 +25,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
+import { getApiUrl } from "@/lib/api";
+import { useState } from "react";
 
 type BuybackPricingRule = {
   id: string;
@@ -58,7 +60,7 @@ export default function AdminPricing() {
       await Promise.all(selectedRules.map(async ruleId => {
         const price = bulkEdit[ruleId];
         if (!price) return;
-        await fetch(`/api/admin/pricing/${ruleId}`, {
+        await fetch(getApiUrl(`/api/admin/pricing/${ruleId}`), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ basePrice: price }),
@@ -100,7 +102,7 @@ export default function AdminPricing() {
         const condition = conditions?.find(c => c.name === conditionName);
         const rule = pricingRules?.find(r => r.variantId === variant?.id && r.conditionProfileId === condition?.id);
         if (rule && basePrice) {
-          await fetch(`/api/admin/pricing/${rule.id}`, {
+          await fetch(getApiUrl(`/api/admin/pricing/${rule.id}`), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ basePrice }),
@@ -141,7 +143,7 @@ export default function AdminPricing() {
   const savePrice = async (ruleId: string) => {
     const price = editPrices[ruleId];
     if (!price) return;
-    await fetch(`/api/admin/pricing/${ruleId}`, {
+    await fetch(getApiUrl(`/api/admin/pricing/${ruleId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ basePrice: price }),

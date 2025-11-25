@@ -8,6 +8,7 @@ import { useToast } from "../../components/AdminToast";
 import { Button } from "../../components/ui/button";
 import { StatusBadge } from "../../components/StatusBadge";
 import { Card } from "../../components/ui/card";
+import { getApiUrl } from "@/lib/api";
 
 interface Order {
   id: string;
@@ -50,7 +51,7 @@ export default function AdminDashboardNew() {
       params.set("page", page.toString());
       params.set("pageSize", pageSize.toString());
 
-      const res = await fetch(`/api/admin/orders?${params}`);
+      const res = await fetch(getApiUrl(`/api/admin/orders?${params}`));
       if (!res.ok) throw new Error("Failed to fetch orders");
       return res.json();
     },
@@ -60,7 +61,7 @@ export default function AdminDashboardNew() {
   const { data: stats } = useQuery({
     queryKey: ["admin-dashboard-stats"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/dashboard-stats");
+      const res = await fetch(getApiUrl("/api/admin/dashboard-stats"));
       if (!res.ok) return {};
       return res.json();
     },
@@ -69,7 +70,7 @@ export default function AdminDashboardNew() {
   // Update status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await fetch(`/api/admin/orders/${id}/status`, {
+      const res = await fetch(getApiUrl(`/api/admin/orders/${id}/status`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -89,7 +90,7 @@ export default function AdminDashboardNew() {
   // Generate label mutation
   const generateLabelMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/admin/orders/${id}/shipment`, {
+      const res = await fetch(getApiUrl(`/api/admin/orders/${id}/shipment`), {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to generate label");
@@ -110,7 +111,7 @@ export default function AdminDashboardNew() {
   // Delete order mutation
   const deleteOrderMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/admin/orders/${id}`, {
+      const res = await fetch(getApiUrl(`/api/admin/orders/${id}`), {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete order");
@@ -452,7 +453,7 @@ function OrderDetailsModal({ orderId, onClose, onDelete }: { orderId: string; on
   const { data: order, isLoading } = useQuery({
     queryKey: ["admin-order-detail", orderId],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/orders/${orderId}`);
+      const res = await fetch(getApiUrl(`/api/admin/orders/${orderId}`));
       if (!res.ok) throw new Error("Failed to fetch order");
       return res.json();
     },
@@ -717,7 +718,7 @@ function ReofferModal({ orderId, onClose }: { orderId: string; onClose: () => vo
 
   const reofferMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/admin/orders/${orderId}/re-offer`, {
+      const res = await fetch(getApiUrl(`/api/admin/orders/${orderId}/re-offer`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newOffer: parseFloat(newOffer), notes }),

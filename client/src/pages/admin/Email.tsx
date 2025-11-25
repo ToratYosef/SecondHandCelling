@@ -8,6 +8,7 @@ import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
 import { Input } from "../../components/ui/input";
+import { getApiUrl } from "@/lib/api";
 
 export default function AdminEmail() {
   const [recipient, setRecipient] = useState("");
@@ -19,7 +20,7 @@ export default function AdminEmail() {
   const { data: emailHistory, isLoading, error, refetch } = useQuery({
     queryKey: ["admin-email-history"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/emails/history");
+      const res = await fetch(getApiUrl("/api/admin/emails/history"));
       if (!res.ok) throw new Error("Failed to fetch email history");
       return res.json();
     },
@@ -27,7 +28,7 @@ export default function AdminEmail() {
 
   const sendEmailMutation = useMutation({
     mutationFn: async (data: { to: string; subject: string; body: string }) => {
-      const res = await fetch("/api/admin/emails/send", {
+      const res = await fetch(getApiUrl("/api/admin/emails/send"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
