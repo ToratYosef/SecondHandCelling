@@ -2641,6 +2641,29 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Failed to get brands" });
     }
   });
+  app2.get("/api/brands/:brandSlug/models", async (req, res) => {
+    try {
+      const { brandSlug } = req.params;
+      const models = await storage.getAllDeviceModels();
+      const brandName = brandSlug.split("-").map(
+        (word) => word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(" ");
+      const filteredModels = models.filter(
+        (m) => m.brand.toLowerCase() === brandSlug.toLowerCase()
+      );
+      const result = filteredModels.map((m) => ({
+        id: m.id,
+        brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, "-")}`,
+        name: m.marketingName || m.name,
+        slug: m.slug,
+        year: null
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error("Get models by brand slug error:", error);
+      res.status(500).json({ error: "Failed to get models" });
+    }
+  });
   app2.get("/api/models", async (req, res) => {
     try {
       const { brandId } = req.query;

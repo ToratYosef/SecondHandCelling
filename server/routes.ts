@@ -685,7 +685,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get models by brand
+  // Get models by brand (RESTful route: /api/brands/:brandSlug/models)
+  app.get("/api/brands/:brandSlug/models", async (req, res) => {
+    try {
+      const { brandSlug } = req.params;
+      const models = await storage.getAllDeviceModels();
+      
+      // Convert slug to brand name (e.g., "apple" -> "Apple", "samsung" -> "Samsung")
+      const brandName = brandSlug.split('-').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+      
+      const filteredModels = models.filter(m => 
+        m.brand.toLowerCase() === brandSlug.toLowerCase()
+      );
+      
+      const result = filteredModels.map(m => ({
+        id: m.id,
+        brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, '-')}`,
+        name: m.marketingName || m.name,
+        slug: m.slug,
+        year: null,
+      }));
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Get models by brand slug error:", error);
+      res.status(500).json({ error: "Failed to get models" });
+    }
+  });
+
+  // Get models by brand (query param route: /api/models?brandId=brand-0)
   app.get("/api/models", async (req, res) => {
     try {
       const { brandId } = req.query;
