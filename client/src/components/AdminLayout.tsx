@@ -16,7 +16,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const { data: stats } = useQuery({
     queryKey: ["admin-quick-stats"],
     queryFn: async () => {
-      const res = await fetch(getApiUrl("/api/admin/quick-stats"));
+      const res = await fetch(getApiUrl("/api/admin/quick-stats"), {
+        credentials: "include",
+      });
       if (!res.ok) return { todayOrders: 0, pending: 0, needsPrinting: 0 };
       return res.json();
     },

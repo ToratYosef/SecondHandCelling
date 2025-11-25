@@ -2630,7 +2630,8 @@ async function registerRoutes(app2) {
     try {
       const models = await storage.getAllDeviceModels();
       const brandsSet = new Set(models.map((m) => m.brand));
-      const brands = Array.from(brandsSet).map((brand, index) => ({
+      const brandsArray = Array.from(brandsSet).sort();
+      const brands = brandsArray.map((brand, index) => ({
         id: `brand-${index}`,
         name: brand,
         slug: brand.toLowerCase().replace(/\s+/g, "-")
@@ -2668,26 +2669,41 @@ async function registerRoutes(app2) {
     try {
       const { brandId } = req.query;
       const models = await storage.getAllDeviceModels();
-      let filteredModels = models;
-      if (brandId && typeof brandId === "string") {
-        let brandName = "";
-        if (brandId.startsWith("brand-")) {
-          const brandPart = brandId.replace("brand-", "");
-          if (/^\d+$/.test(brandPart)) {
-            const brandsSet = new Set(models.map((m) => m.brand));
-            const brandsArray = Array.from(brandsSet);
-            const index = parseInt(brandPart, 10);
-            brandName = brandsArray[index] || "";
-          } else {
-            brandName = brandPart.split("-").map(
-              (word) => word.charAt(0).toUpperCase() + word.slice(1)
-            ).join(" ");
-          }
-        }
-        if (brandName) {
-          filteredModels = models.filter((m) => m.brand === brandName);
+      console.log("[/api/models] Total models:", models.length);
+      console.log("[/api/models] brandId param:", brandId);
+      if (!brandId || typeof brandId !== "string") {
+        const result2 = models.map((m) => ({
+          id: m.id,
+          brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, "-")}`,
+          name: m.marketingName || m.name,
+          slug: m.slug,
+          year: null
+        }));
+        return res.json(result2);
+      }
+      let brandName = "";
+      if (brandId.startsWith("brand-")) {
+        const brandPart = brandId.replace("brand-", "");
+        if (/^\d+$/.test(brandPart)) {
+          const brandsSet = new Set(models.map((m) => m.brand));
+          const brandsArray = Array.from(brandsSet).sort();
+          const index = parseInt(brandPart, 10);
+          brandName = brandsArray[index] || "";
+          console.log("[/api/models] Brands array:", brandsArray);
+          console.log("[/api/models] Selected brand by index", index, ":", brandName);
+        } else {
+          brandName = brandPart.charAt(0).toUpperCase() + brandPart.slice(1);
+          console.log("[/api/models] Selected brand by slug:", brandName);
         }
       }
+      if (!brandName) {
+        console.log("[/api/models] No brand name found, returning empty");
+        return res.json([]);
+      }
+      const filteredModels = models.filter(
+        (m) => m.brand.toLowerCase() === brandName.toLowerCase()
+      );
+      console.log("[/api/models] Filtered models count:", filteredModels.length);
       const result = filteredModels.map((m) => ({
         id: m.id,
         brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, "-")}`,

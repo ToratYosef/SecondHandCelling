@@ -51,7 +51,9 @@ export default function AdminDashboardNew() {
       params.set("page", page.toString());
       params.set("pageSize", pageSize.toString());
 
-      const res = await fetch(getApiUrl(`/api/admin/orders?${params}`));
+      const res = await fetch(getApiUrl(`/api/admin/orders?${params}`), {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch orders");
       return res.json();
     },
@@ -61,7 +63,9 @@ export default function AdminDashboardNew() {
   const { data: stats } = useQuery({
     queryKey: ["admin-dashboard-stats"],
     queryFn: async () => {
-      const res = await fetch(getApiUrl("/api/admin/dashboard-stats"));
+      const res = await fetch(getApiUrl("/api/admin/dashboard-stats"), {
+        credentials: "include",
+      });
       if (!res.ok) return {};
       return res.json();
     },
