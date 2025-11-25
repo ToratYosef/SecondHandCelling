@@ -146,6 +146,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== PUBLIC API ROUTES (No Auth Required) ====================
   
+  // Site settings (public)
+  app.get("/api/settings", async (req, res) => {
+    try {
+      const payload = {
+        logoUrl: process.env.SITE_LOGO_URL || null,
+        siteName: "SecondHandCell",
+      };
+      res.json(payload);
+    } catch (error: any) {
+      console.error("Get settings error:", error);
+      res.status(500).json({ error: "Failed to get settings" });
+    }
+  });
+
   // Get public categories
   app.get("/api/public/categories", async (req, res) => {
     try {
