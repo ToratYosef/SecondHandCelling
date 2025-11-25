@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Package, FileText, DollarSign, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { getApiUrl } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -22,7 +23,15 @@ type SellOrderWithItems = {
 
 export default function AccountOverview() {
   const { data: orders, isLoading } = useQuery<SellOrderWithItems[]>({
-    queryKey: ['/api/orders/my-orders'],
+    queryKey: ['/api/orders'],
+    queryFn: async () => {
+      const res = await fetch(getApiUrl('/api/orders'), { credentials: 'include' });
+      if (res.status === 401) {
+        return [];
+      }
+      if (!res.ok) throw new Error('Failed to load orders');
+      return res.json();
+    },
   });
 
   const recentOrder = orders?.[0];

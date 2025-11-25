@@ -3146,6 +3146,32 @@ Notes: ${notes2}` : ""}`;
       res.status(500).json({ error: "Failed to get order" });
     }
   });
+  app2.get("/api/orders/by-number/:orderNumber", async (req, res) => {
+    try {
+      const order = await storage.getOrderByNumber(req.params.orderNumber);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      const items = await storage.getOrderItems(order.id);
+      const safeItems = items.map((i) => ({
+        deviceVariantId: i.deviceVariantId,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice
+      }));
+      res.json({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        total: order.total,
+        currency: order.currency,
+        createdAt: order.createdAt,
+        items: safeItems
+      });
+    } catch (error) {
+      console.error("Public get order by number error:", error);
+      res.status(500).json({ error: "Failed to get order" });
+    }
+  });
   app2.post("/api/create-payment-intent", requireAuth, async (req, res) => {
     try {
       if (!stripe) {
