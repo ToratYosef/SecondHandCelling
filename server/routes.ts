@@ -673,7 +673,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const models = await storage.getAllDeviceModels();
       const brandsSet = new Set(models.map(m => m.brand));
-      const brands = Array.from(brandsSet).map((brand, index) => ({
+      // Sort alphabetically for consistent indexing
+      const brandsArray = Array.from(brandsSet).sort();
+      const brands = brandsArray.map((brand, index) => ({
         id: `brand-${index}`,
         name: brand,
         slug: brand.toLowerCase().replace(/\s+/g, '-'),
@@ -721,32 +723,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { brandId } = req.query;
       const models = await storage.getAllDeviceModels();
       
-      // If brandId is provided, extract the brand name from it
-      let filteredModels = models;
-      if (brandId && typeof brandId === 'string') {
-        // Extract brand name from brand-0, brand-1, etc. or from brand-apple format
-        let brandName = '';
-        if (brandId.startsWith('brand-')) {
-          const brandPart = brandId.replace('brand-', '');
-          // Check if it's a number (brand-0) or name (brand-apple)
-          if (/^\d+$/.test(brandPart)) {
-            // Get brand by index
-            const brandsSet = new Set(models.map(m => m.brand));
-            const brandsArray = Array.from(brandsSet);
-            const index = parseInt(brandPart, 10);
-            brandName = brandsArray[index] || '';
-          } else {
-            // Convert slug back to proper name
-            brandName = brandPart.split('-').map(word => 
-              word.charAt(0).toUpperCase() + word.slice(1)
-            ).join(' ');
-          }
-        }
-        
-        if (brandName) {
-          filteredModels = models.filter(m => m.brand === brandName);
+      console.log('[/api/models] Total models:', models.length);
+      console.log('[/api/models] brandId param:', brandId);
+      
+      // If no brandId, return all models
+      if (!brandId || typeof brandId !== 'string') {
+        const result = models.map(m => ({
+          id: m.id,
+          brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, '-')}`,
+          name: m.marketingName || m.name,
+          slug: m.slug,
+          year: null,
+        }));
+        return res.json(result);
+      }
+      
+      // Extract brand name from brandId
+      let brandName = '';
+      if (brandId.startsWith('brand-')) {
+        const brandPart = brandId.replace('brand-', '');
+        // Check if it's a number (brand-0) or slug (brand-apple)
+        if (/^\d+$/.test(brandPart)) {
+          // Get brand by index - sort brands alphabetically for consistency
+          const brandsSet = new Set(models.map(m => m.brand));
+          const brandsArray = Array.from(brandsSet).sort();
+          const index = parseInt(brandPart, 10);
+          brandName = brandsArray[index] || '';
+          console.log('[/api/models] Brands array:', brandsArray);
+          console.log('[/api/models] Selected brand by index', index, ':', brandName);
+        } else {
+          // Convert slug to proper name (apple -> Apple, samsung -> Samsung)
+          brandName = brandPart.charAt(0).toUpperCase() + brandPart.slice(1);
+          console.log('[/api/models] Selected brand by slug:', brandName);
         }
       }
+      
+      if (!brandName) {
+        console.log('[/api/models] No brand name found, returning empty');
+        return res.json([]);
+      }
+      
+      // Filter models by brand (case-insensitive)
+      const filteredModels = models.filter(m => 
+        m.brand.toLowerCase() === brandName.toLowerCase()
+      );
+      
+      console.log('[/api/models] Filtered models count:', filteredModels.length);
       
       const result = filteredModels.map(m => ({
         id: m.id,
