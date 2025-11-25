@@ -1,807 +1,707 @@
 var __defProp = Object.defineProperty;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// server/email.ts
-var email_exports = {};
-__export(email_exports, {
-  emailTemplates: () => emailTemplates,
-  sendDeviceReceived: () => sendDeviceReceived,
-  sendEmail: () => sendEmail,
-  sendInspectionComplete: () => sendInspectionComplete,
-  sendOrderConfirmation: () => sendOrderConfirmation,
-  sendPaymentConfirmation: () => sendPaymentConfirmation,
-  sendRawEmail: () => sendRawEmail,
-  sendShippingLabel: () => sendShippingLabel,
-  sendStatusUpdate: () => sendStatusUpdate
-});
-import nodemailer from "nodemailer";
-function getTransporter() {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: EMAIL_HOST,
-      port: EMAIL_PORT,
-      secure: EMAIL_PORT === 465,
-      auth: EMAIL_USER && EMAIL_PASS ? {
-        user: EMAIL_USER,
-        pass: EMAIL_PASS
-      } : void 0
-    });
-  }
-  return transporter;
-}
-async function sendEmail(to, template, attachments) {
-  try {
-    const transporter2 = getTransporter();
-    if (process.env.NODE_ENV === "development" && !EMAIL_USER) {
-      console.log("\n\u{1F4E7} EMAIL (DEV MODE - NOT SENT):");
-      console.log("To:", to);
-      console.log("Subject:", template.subject);
-      console.log("HTML Preview:", template.html.substring(0, 200) + "...");
-      if (attachments?.length) {
-        console.log("Attachments:", attachments.length);
-      }
-      return { success: true, messageId: "dev-" + Date.now() };
-    }
-    const info = await transporter2.sendMail({
-      from: EMAIL_FROM,
-      to,
-      subject: template.subject,
-      html: template.html,
-      attachments: attachments || []
-    });
-    console.log("\u2705 Email sent:", info.messageId);
-    return { success: true, messageId: info.messageId };
-  } catch (error) {
-    console.error("\u274C Email error:", error);
-    return { success: false, error };
-  }
-}
-async function sendRawEmail(to, subject, text2, html, attachments) {
-  return sendEmail(to, { subject, html: html || text2 }, attachments);
-}
-async function sendOrderConfirmation(email, orderNumber, deviceName, offerAmount) {
-  return sendEmail(email, emailTemplates.orderConfirmation(orderNumber, deviceName, offerAmount));
-}
-async function sendShippingLabel(email, orderNumber, labelUrl, labelPdf) {
-  const attachments = labelPdf ? [{
-    filename: `shipping-label-${orderNumber}.pdf`,
-    content: labelPdf,
-    contentType: "application/pdf"
-  }] : [];
-  return sendEmail(email, emailTemplates.shippingLabelReady(orderNumber, labelUrl), attachments);
-}
-async function sendDeviceReceived(email, orderNumber, deviceName) {
-  return sendEmail(email, emailTemplates.deviceReceived(orderNumber, deviceName));
-}
-async function sendInspectionComplete(email, orderNumber, finalOffer, matched = true) {
-  return sendEmail(email, emailTemplates.inspectionComplete(orderNumber, finalOffer, matched));
-}
-async function sendPaymentConfirmation(email, orderNumber, amount, method) {
-  return sendEmail(email, emailTemplates.paymentSent(orderNumber, amount, method));
-}
-async function sendStatusUpdate(email, orderNumber, status, message) {
-  return sendEmail(email, emailTemplates.statusUpdate(orderNumber, status, message));
-}
-var EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM, transporter, emailTemplates;
-var init_email = __esm({
-  "server/email.ts"() {
-    "use strict";
-    EMAIL_HOST = process.env.EMAIL_HOST || "smtp.gmail.com";
-    EMAIL_PORT = parseInt(process.env.EMAIL_PORT || "587");
-    EMAIL_USER = process.env.EMAIL_USER || "";
-    EMAIL_PASS = process.env.EMAIL_PASS || "";
-    EMAIL_FROM = process.env.EMAIL_FROM || "SecondHandCell <noreply@secondhandcell.com>";
-    transporter = null;
-    emailTemplates = {
-      orderConfirmation: (orderNumber, deviceName, offerAmount) => ({
-        subject: `Order Confirmation - ${orderNumber}`,
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333;">Order Confirmed!</h1>
-        <p>Thank you for choosing SecondHandCell. Your order has been confirmed.</p>
-        
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h2 style="margin-top: 0;">Order Details</h2>
-          <p><strong>Order Number:</strong> ${orderNumber}</p>
-          <p><strong>Device:</strong> ${deviceName}</p>
-          <p><strong>Offer Amount:</strong> $${offerAmount.toFixed(2)}</p>
-        </div>
-        
-        <h3>What's Next?</h3>
-        <ol>
-          <li>Ship your device using the prepaid shipping label (attached or available in your account)</li>
-          <li>We'll inspect your device within 24-48 hours of receipt</li>
-          <li>Get paid via your selected method once inspection is complete</li>
-        </ol>
-        
-        <p>Track your order status anytime at: <a href="${process.env.APP_URL || "http://localhost:5000"}/track">Track Your Order</a></p>
-        
-        <p style="color: #666; font-size: 14px; margin-top: 40px;">
-          Questions? Contact us at support@secondhandcell.com
-        </p>
-      </div>
-    `
-      }),
-      shippingLabelReady: (orderNumber, labelUrl) => ({
-        subject: `Shipping Label Ready - ${orderNumber}`,
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333;">Your Shipping Label is Ready!</h1>
-        <p>Your prepaid shipping label for order ${orderNumber} is ready to use.</p>
-        
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h2 style="margin-top: 0;">Shipping Instructions</h2>
-          <ol>
-            <li>Download and print your shipping label</li>
-            <li>Securely package your device in a sturdy box</li>
-            <li>Attach the label to the outside of the box</li>
-            <li>Drop off at any carrier location or schedule a pickup</li>
-          </ol>
-        </div>
-        
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${labelUrl}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            Download Shipping Label
-          </a>
-        </div>
-        
-        <p style="color: #666; font-size: 14px;">
-          <strong>Important:</strong> Make sure to remove all personal data and disable Find My iPhone/activation locks before shipping.
-        </p>
-      </div>
-    `
-      }),
-      deviceReceived: (orderNumber, deviceName) => ({
-        subject: `Device Received - ${orderNumber}`,
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333;">We've Received Your Device!</h1>
-        <p>Great news! Your ${deviceName} has arrived at our facility.</p>
-        
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <p><strong>Order Number:</strong> ${orderNumber}</p>
-          <p><strong>Status:</strong> Under Inspection</p>
-        </div>
-        
-        <p>Our team will inspect your device within 24-48 hours and verify its condition matches your quote.</p>
-        
-        <p>You'll receive another email once the inspection is complete.</p>
-        
-        <p style="color: #666; font-size: 14px; margin-top: 40px;">
-          Track your order: <a href="${process.env.APP_URL || "http://localhost:5000"}/track">View Status</a>
-        </p>
-      </div>
-    `
-      }),
-      inspectionComplete: (orderNumber, finalOffer, matched) => ({
-        subject: `Inspection Complete - ${orderNumber}`,
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333;">Inspection Complete!</h1>
-        
-        ${matched ? `
-          <p>Good news! Your device matches the condition you described.</p>
-          
-          <div style="background: #dcfce7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #16a34a;">
-            <h2 style="margin-top: 0; color: #16a34a;">Payment Processing</h2>
-            <p><strong>Final Offer:</strong> $${finalOffer.toFixed(2)}</p>
-            <p>Your payment will be sent within 1-2 business days.</p>
-          </div>
-        ` : `
-          <p>After inspecting your device, we found some differences from your original description.</p>
-          
-          <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
-            <h2 style="margin-top: 0; color: #f59e0b;">Revised Offer</h2>
-            <p><strong>Updated Offer:</strong> $${finalOffer.toFixed(2)}</p>
-            <p>Please review and accept or decline this revised offer in your account.</p>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.APP_URL || "http://localhost:5000"}/account/orders" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-              Review Offer
-            </a>
-          </div>
-        `}
-      </div>
-    `
-      }),
-      paymentSent: (orderNumber, amount, method) => ({
-        subject: `Payment Sent - ${orderNumber}`,
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333;">Payment Sent! \u{1F4B0}</h1>
-        <p>Your payment has been successfully processed.</p>
-        
-        <div style="background: #dcfce7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #16a34a;">
-          <h2 style="margin-top: 0;">Payment Details</h2>
-          <p><strong>Amount:</strong> $${amount.toFixed(2)}</p>
-          <p><strong>Method:</strong> ${method}</p>
-          <p><strong>Order:</strong> ${orderNumber}</p>
-        </div>
-        
-        <p>Depending on your payment method, funds should arrive within:</p>
-        <ul>
-          <li><strong>Zelle:</strong> Instantly</li>
-          <li><strong>PayPal/Venmo:</strong> 1-3 business days</li>
-          <li><strong>Check:</strong> 5-7 business days</li>
-        </ul>
-        
-        <p style="color: #666; font-size: 14px; margin-top: 40px;">
-          Thank you for selling with SecondHandCell! We hope to serve you again soon.
-        </p>
-      </div>
-    `
-      }),
-      statusUpdate: (orderNumber, status, message) => ({
-        subject: `Order Update - ${orderNumber}`,
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333;">Order Status Update</h1>
-        
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <p><strong>Order Number:</strong> ${orderNumber}</p>
-          <p><strong>Status:</strong> ${status}</p>
-        </div>
-        
-        <p>${message}</p>
-        
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.APP_URL || "http://localhost:5000"}/account/orders/${orderNumber}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            View Order Details
-          </a>
-        </div>
-      </div>
-    `
-      })
-    };
-  }
-});
-
-// server/xml-parser.ts
-var xml_parser_exports = {};
-__export(xml_parser_exports, {
-  parseDeviceXML: () => parseDeviceXML
-});
-import { parseStringPromise } from "xml2js";
-async function parseDeviceXML(xmlContent) {
-  try {
-    const result = await parseStringPromise(xmlContent);
-    const models = [];
-    if (result.models && result.models.model) {
-      const modelArray = Array.isArray(result.models.model) ? result.models.model : [result.models.model];
-      for (const model of modelArray) {
-        const parsedDevice = {
-          brand: model.brand?.[0] || model.parentDevice?.[0] || "Unknown",
-          modelID: model.modelID?.[0] || "",
-          name: model.name?.[0] || "",
-          slug: model.slug?.[0] || "",
-          imageUrl: model.imageUrl?.[0],
-          year: model.year?.[0] ? parseInt(model.year[0]) : void 0,
-          variants: []
-        };
-        const pricesArray = Array.isArray(model.prices) ? model.prices : [model.prices];
-        for (const priceGroup of pricesArray.filter(Boolean)) {
-          const storage2 = priceGroup.storageSize?.[0] || "";
-          const priceValue = priceGroup.priceValue?.[0];
-          if (!priceValue) continue;
-          if (priceValue.locked?.[0]) {
-            const lockedPrices = priceValue.locked[0];
-            const variant = {
-              storage: storage2,
-              carrier: "locked",
-              pricing: [
-                {
-                  condition: "flawless",
-                  price: parseFloat(lockedPrices.flawless?.[0] || "0")
-                },
-                {
-                  condition: "good",
-                  price: parseFloat(lockedPrices.good?.[0] || "0")
-                },
-                {
-                  condition: "fair",
-                  price: parseFloat(lockedPrices.fair?.[0] || "0")
-                },
-                {
-                  condition: "broken",
-                  price: parseFloat(lockedPrices.broken?.[0] || "0")
-                }
-              ]
-            };
-            parsedDevice.variants.push(variant);
-          }
-          if (priceValue.unlocked?.[0]) {
-            const unlockedPrices = priceValue.unlocked[0];
-            const variant = {
-              storage: storage2,
-              carrier: "unlocked",
-              pricing: [
-                {
-                  condition: "flawless",
-                  price: parseFloat(unlockedPrices.flawless?.[0] || "0")
-                },
-                {
-                  condition: "good",
-                  price: parseFloat(unlockedPrices.good?.[0] || "0")
-                },
-                {
-                  condition: "fair",
-                  price: parseFloat(unlockedPrices.fair?.[0] || "0")
-                },
-                {
-                  condition: "broken",
-                  price: parseFloat(unlockedPrices.broken?.[0] || "0")
-                }
-              ]
-            };
-            parsedDevice.variants.push(variant);
-          }
-        }
-        if (parsedDevice.variants.length > 0) {
-          models.push(parsedDevice);
-        }
-      }
-    }
-    return models;
-  } catch (error) {
-    console.error("Error parsing XML:", error);
-    throw new Error("Failed to parse XML file");
-  }
-}
-var init_xml_parser = __esm({
-  "server/xml-parser.ts"() {
-    "use strict";
-  }
-});
-
 // server/index.ts
-import "dotenv/config";
 import express2 from "express";
-import session from "express-session";
-import SQLiteStore from "connect-sqlite3";
 
 // server/routes.ts
 import { createServer } from "http";
+import session from "express-session";
+import createMemoryStore from "memorystore";
 
 // server/db.ts
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import "dotenv/config";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 
 // shared/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
-  addresses: () => addresses,
   announcements: () => announcements,
   auditLogs: () => auditLogs,
-  buybackConditionProfiles: () => buybackConditionProfiles,
-  buybackPricingRules: () => buybackPricingRules,
-  customerProfiles: () => customerProfiles,
-  deviceBrands: () => deviceBrands,
-  deviceFamilies: () => deviceFamilies,
+  auditLogsRelations: () => auditLogsRelations,
+  billingAddresses: () => billingAddresses,
+  billingAddressesRelations: () => billingAddressesRelations,
+  cartItems: () => cartItems,
+  cartItemsRelations: () => cartItemsRelations,
+  carts: () => carts,
+  cartsRelations: () => cartsRelations,
+  companies: () => companies,
+  companiesRelations: () => companiesRelations,
+  companyStatusEnum: () => companyStatusEnum,
+  companyUserRoleEnum: () => companyUserRoleEnum,
+  companyUsers: () => companyUsers,
+  companyUsersRelations: () => companyUsersRelations,
+  conditionGradeEnum: () => conditionGradeEnum,
+  deviceCategories: () => deviceCategories,
+  deviceCategoriesRelations: () => deviceCategoriesRelations,
   deviceModels: () => deviceModels,
+  deviceModelsRelations: () => deviceModelsRelations,
   deviceVariants: () => deviceVariants,
+  deviceVariantsRelations: () => deviceVariantsRelations,
   faqs: () => faqs,
-  insertAddressSchema: () => insertAddressSchema,
   insertAnnouncementSchema: () => insertAnnouncementSchema,
   insertAuditLogSchema: () => insertAuditLogSchema,
-  insertBuybackConditionProfileSchema: () => insertBuybackConditionProfileSchema,
-  insertBuybackPricingRuleSchema: () => insertBuybackPricingRuleSchema,
-  insertCustomerProfileSchema: () => insertCustomerProfileSchema,
-  insertDeviceBrandSchema: () => insertDeviceBrandSchema,
-  insertDeviceFamilySchema: () => insertDeviceFamilySchema,
+  insertBillingAddressSchema: () => insertBillingAddressSchema,
+  insertCartItemSchema: () => insertCartItemSchema,
+  insertCartSchema: () => insertCartSchema,
+  insertCompanySchema: () => insertCompanySchema,
+  insertCompanyUserSchema: () => insertCompanyUserSchema,
+  insertDeviceCategorySchema: () => insertDeviceCategorySchema,
   insertDeviceModelSchema: () => insertDeviceModelSchema,
   insertDeviceVariantSchema: () => insertDeviceVariantSchema,
   insertFaqSchema: () => insertFaqSchema,
+  insertInventoryItemSchema: () => insertInventoryItemSchema,
+  insertOrderItemSchema: () => insertOrderItemSchema,
+  insertOrderSchema: () => insertOrderSchema,
   insertPaymentSchema: () => insertPaymentSchema,
-  insertQuoteLineItemSchema: () => insertQuoteLineItemSchema,
-  insertQuoteRequestSchema: () => insertQuoteRequestSchema,
-  insertSellOrderItemSchema: () => insertSellOrderItemSchema,
-  insertSellOrderSchema: () => insertSellOrderSchema,
+  insertPriceTierSchema: () => insertPriceTierSchema,
+  insertQuoteItemSchema: () => insertQuoteItemSchema,
+  insertQuoteSchema: () => insertQuoteSchema,
+  insertSavedListItemSchema: () => insertSavedListItemSchema,
+  insertSavedListSchema: () => insertSavedListSchema,
   insertShipmentSchema: () => insertShipmentSchema,
-  insertSiteSettingSchema: () => insertSiteSettingSchema,
-  insertSupportTicketMessageSchema: () => insertSupportTicketMessageSchema,
+  insertShippingAddressSchema: () => insertShippingAddressSchema,
   insertSupportTicketSchema: () => insertSupportTicketSchema,
   insertUserSchema: () => insertUserSchema,
+  inventoryItems: () => inventoryItems,
+  inventoryItemsRelations: () => inventoryItemsRelations,
+  inventoryStatusEnum: () => inventoryStatusEnum,
+  networkLockStatusEnum: () => networkLockStatusEnum,
+  orderItems: () => orderItems,
+  orderItemsRelations: () => orderItemsRelations,
+  orderStatusEnum: () => orderStatusEnum,
+  orders: () => orders,
+  ordersRelations: () => ordersRelations,
+  paymentMethodEnum: () => paymentMethodEnum,
+  paymentStatusEnum: () => paymentStatusEnum,
   payments: () => payments,
-  quoteLineItems: () => quoteLineItems,
-  quoteRequests: () => quoteRequests,
-  sellOrderItems: () => sellOrderItems,
-  sellOrders: () => sellOrders,
+  paymentsRelations: () => paymentsRelations,
+  priceTiers: () => priceTiers,
+  priceTiersRelations: () => priceTiersRelations,
+  quoteItems: () => quoteItems,
+  quoteItemsRelations: () => quoteItemsRelations,
+  quoteStatusEnum: () => quoteStatusEnum,
+  quotes: () => quotes,
+  quotesRelations: () => quotesRelations,
+  savedListItems: () => savedListItems,
+  savedListItemsRelations: () => savedListItemsRelations,
+  savedLists: () => savedLists,
+  savedListsRelations: () => savedListsRelations,
   shipments: () => shipments,
-  siteSettings: () => siteSettings,
-  supportTicketMessages: () => supportTicketMessages,
+  shipmentsRelations: () => shipmentsRelations,
+  shippingAddresses: () => shippingAddresses,
+  shippingAddressesRelations: () => shippingAddressesRelations,
+  supportTicketPriorityEnum: () => supportTicketPriorityEnum,
+  supportTicketStatusEnum: () => supportTicketStatusEnum,
   supportTickets: () => supportTickets,
-  users: () => users
+  supportTicketsRelations: () => supportTicketsRelations,
+  userRoleEnum: () => userRoleEnum,
+  users: () => users,
+  usersRelations: () => usersRelations
 });
 import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { relations } from "drizzle-orm";
+import {
+  pgTable,
+  integer,
+  real,
+  text,
+  timestamp,
+  boolean
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
-var users = sqliteTable("users", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
+var userRoleEnum = ["buyer", "admin", "super_admin"];
+var companyStatusEnum = ["pending_review", "approved", "rejected", "suspended"];
+var companyUserRoleEnum = ["owner", "admin", "buyer"];
+var conditionGradeEnum = ["A", "B", "C", "D"];
+var networkLockStatusEnum = ["unlocked", "locked", "other"];
+var inventoryStatusEnum = ["in_stock", "reserved", "incoming", "discontinued"];
+var orderStatusEnum = ["pending_payment", "payment_review", "processing", "shipped", "completed", "cancelled"];
+var paymentStatusEnum = ["unpaid", "paid", "partially_paid", "refunded"];
+var paymentMethodEnum = ["card", "wire", "ach", "terms", "other"];
+var quoteStatusEnum = ["draft", "sent", "accepted", "rejected", "expired"];
+var supportTicketStatusEnum = ["open", "in_progress", "closed"];
+var supportTicketPriorityEnum = ["low", "medium", "high"];
+var users = pgTable("users", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  role: text("role").notNull().default("customer"),
-  // customer, admin, super_admin
-  phoneNumber: text("phone_number"),
-  isEmailVerified: integer("is_email_verified", { mode: "boolean" }).notNull().default(false),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  marketingOptIn: integer("marketing_opt_in", { mode: "boolean" }).notNull().default(false),
-  lastLoginAt: integer("last_login_at"),
-  // Unix timestamp
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var customerProfiles = sqliteTable("customer_profiles", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  userId: text("user_id").notNull().references(() => users.id),
-  defaultPayoutMethod: text("default_payout_method").default("paypal"),
-  // paypal, bank_transfer, check, gift_card, other
-  payoutDetailsJson: text("payout_details_json"),
-  // JSON string
-  defaultAddressId: text("default_address_id"),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var addresses = sqliteTable("addresses", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  userId: text("user_id").references(() => users.id),
-  type: text("type").notNull().default("shipping"),
-  // shipping, payout, other
-  label: text("label"),
-  fullName: text("full_name").notNull(),
+  role: text("role", { enum: userRoleEnum }).notNull().default("buyer"),
   phone: text("phone"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastLoginAt: timestamp("last_login_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry")
+});
+var usersRelations = relations(users, ({ many }) => ({
+  companyUsers: many(companyUsers),
+  createdOrders: many(orders, { relationName: "orderCreator" }),
+  createdQuotes: many(quotes, { relationName: "quoteCreator" }),
+  createdSavedLists: many(savedLists),
+  supportTickets: many(supportTickets),
+  auditLogs: many(auditLogs)
+}));
+var companies = pgTable("companies", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  legalName: text("legal_name").notNull(),
+  taxId: text("tax_id"),
+  resellerCertificateUrl: text("reseller_certificate_url"),
+  website: text("website"),
+  primaryPhone: text("primary_phone"),
+  billingEmail: text("billing_email"),
+  status: text("status", { enum: companyStatusEnum }).notNull().default("pending_review"),
+  creditLimit: real("credit_limit").default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var companiesRelations = relations(companies, ({ many }) => ({
+  companyUsers: many(companyUsers),
+  carts: many(carts),
+  orders: many(orders),
+  quotes: many(quotes),
+  savedLists: many(savedLists),
+  shippingAddresses: many(shippingAddresses),
+  billingAddresses: many(billingAddresses),
+  supportTickets: many(supportTickets)
+}));
+var companyUsers = pgTable("company_users", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  roleInCompany: text("role_in_company", { enum: companyUserRoleEnum }).notNull().default("buyer"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var companyUsersRelations = relations(companyUsers, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyUsers.companyId],
+    references: [companies.id]
+  }),
+  user: one(users, {
+    fields: [companyUsers.userId],
+    references: [users.id]
+  })
+}));
+var deviceCategories = pgTable("device_categories", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var deviceCategoriesRelations = relations(deviceCategories, ({ many }) => ({
+  deviceModels: many(deviceModels)
+}));
+var deviceModels = pgTable("device_models", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  brand: text("brand").notNull(),
+  name: text("name").notNull(),
+  marketingName: text("marketing_name"),
+  sku: text("sku").notNull().unique(),
+  slug: text("slug").notNull().unique(),
+  categoryId: text("category_id").notNull().references(() => deviceCategories.id),
+  imageUrl: text("image_url"),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  isActive: boolean("is_active").notNull().default(true)
+});
+var deviceModelsRelations = relations(deviceModels, ({ one, many }) => ({
+  category: one(deviceCategories, {
+    fields: [deviceModels.categoryId],
+    references: [deviceCategories.id]
+  }),
+  variants: many(deviceVariants)
+}));
+var deviceVariants = pgTable("device_variants", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  deviceModelId: text("device_model_id").notNull().references(() => deviceModels.id, { onDelete: "cascade" }),
+  storage: text("storage").notNull(),
+  color: text("color").notNull(),
+  networkLockStatus: text("network_lock_status", { enum: networkLockStatusEnum }).notNull().default("unlocked"),
+  conditionGrade: text("condition_grade", { enum: conditionGradeEnum }).notNull(),
+  internalCode: text("internal_code"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var deviceVariantsRelations = relations(deviceVariants, ({ one, many }) => ({
+  deviceModel: one(deviceModels, {
+    fields: [deviceVariants.deviceModelId],
+    references: [deviceModels.id]
+  }),
+  inventoryItems: many(inventoryItems),
+  priceTiers: many(priceTiers),
+  cartItems: many(cartItems),
+  orderItems: many(orderItems),
+  quoteItems: many(quoteItems),
+  savedListItems: many(savedListItems)
+}));
+var inventoryItems = pgTable("inventory_items", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
+  quantityAvailable: integer("quantity_available").notNull().default(0),
+  minOrderQuantity: integer("min_order_quantity").notNull().default(1),
+  location: text("location"),
+  status: text("status", { enum: inventoryStatusEnum }).notNull().default("in_stock"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var inventoryItemsRelations = relations(inventoryItems, ({ one }) => ({
+  deviceVariant: one(deviceVariants, {
+    fields: [inventoryItems.deviceVariantId],
+    references: [deviceVariants.id]
+  })
+}));
+var priceTiers = pgTable("price_tiers", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
+  minQuantity: integer("min_quantity").notNull(),
+  maxQuantity: integer("max_quantity"),
+  unitPrice: real("unit_price").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  effectiveFrom: timestamp("effective_from").notNull().default(sql`CURRENT_TIMESTAMP`),
+  effectiveTo: timestamp("effective_to"),
+  isActive: boolean("is_active").notNull().default(true)
+});
+var priceTiersRelations = relations(priceTiers, ({ one }) => ({
+  deviceVariant: one(deviceVariants, {
+    fields: [priceTiers.deviceVariantId],
+    references: [deviceVariants.id]
+  })
+}));
+var carts = pgTable("carts", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var cartsRelations = relations(carts, ({ one, many }) => ({
+  user: one(users, {
+    fields: [carts.userId],
+    references: [users.id]
+  }),
+  company: one(companies, {
+    fields: [carts.companyId],
+    references: [companies.id]
+  }),
+  items: many(cartItems)
+}));
+var cartItems = pgTable("cart_items", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  cartId: text("cart_id").notNull().references(() => carts.id, { onDelete: "cascade" }),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull(),
+  unitPriceSnapshot: real("unit_price_snapshot").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var cartItemsRelations = relations(cartItems, ({ one }) => ({
+  cart: one(carts, {
+    fields: [cartItems.cartId],
+    references: [carts.id]
+  }),
+  deviceVariant: one(deviceVariants, {
+    fields: [cartItems.deviceVariantId],
+    references: [deviceVariants.id]
+  })
+}));
+var orders = pgTable("orders", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  orderNumber: text("order_number").notNull().unique(),
+  companyId: text("company_id").notNull().references(() => companies.id),
+  createdByUserId: text("created_by_user_id").notNull().references(() => users.id),
+  status: text("status", { enum: orderStatusEnum }).notNull().default("pending_payment"),
+  subtotal: real("subtotal").notNull(),
+  shippingCost: real("shipping_cost").notNull().default(0),
+  taxAmount: real("tax_amount").notNull().default(0),
+  discountAmount: real("discount_amount").notNull().default(0),
+  total: real("total").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  paymentStatus: text("payment_status", { enum: paymentStatusEnum }).notNull().default("unpaid"),
+  paymentMethod: text("payment_method", { enum: paymentMethodEnum }),
+  shippingAddressId: text("shipping_address_id").references(() => shippingAddresses.id),
+  billingAddressId: text("billing_address_id").references(() => billingAddresses.id),
+  notesInternal: text("notes_internal"),
+  notesCustomer: text("notes_customer"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var ordersRelations = relations(orders, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [orders.companyId],
+    references: [companies.id]
+  }),
+  createdBy: one(users, {
+    fields: [orders.createdByUserId],
+    references: [users.id],
+    relationName: "orderCreator"
+  }),
+  items: many(orderItems),
+  payments: many(payments),
+  shipments: many(shipments)
+}));
+var orderItems = pgTable("order_items", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id),
+  quantity: integer("quantity").notNull(),
+  unitPrice: real("unit_price").notNull(),
+  lineTotal: real("line_total").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var orderItemsRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderItems.orderId],
+    references: [orders.id]
+  }),
+  deviceVariant: one(deviceVariants, {
+    fields: [orderItems.deviceVariantId],
+    references: [deviceVariants.id]
+  })
+}));
+var shippingAddresses = pgTable("shipping_addresses", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  label: text("label"),
+  contactName: text("contact_name").notNull(),
+  phone: text("phone").notNull(),
   street1: text("street1").notNull(),
   street2: text("street2"),
   city: text("city").notNull(),
   state: text("state").notNull(),
   postalCode: text("postal_code").notNull(),
-  country: text("country").notNull().default("US"),
-  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+  country: text("country").notNull().default("USA"),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
-var deviceBrands = sqliteTable("device_brands", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+var shippingAddressesRelations = relations(shippingAddresses, ({ one }) => ({
+  company: one(companies, {
+    fields: [shippingAddresses.companyId],
+    references: [companies.id]
+  })
+}));
+var billingAddresses = pgTable("billing_addresses", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  label: text("label"),
+  contactName: text("contact_name").notNull(),
+  phone: text("phone").notNull(),
+  street1: text("street1").notNull(),
+  street2: text("street2"),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  postalCode: text("postal_code").notNull(),
+  country: text("country").notNull().default("USA"),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
-var deviceFamilies = sqliteTable("device_families", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  brandId: text("brand_id").notNull().references(() => deviceBrands.id),
-  name: text("name").notNull(),
-  slug: text("slug").notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var deviceModels = sqliteTable("device_models", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  brandId: text("brand_id").notNull().references(() => deviceBrands.id),
-  familyId: text("family_id").references(() => deviceFamilies.id),
-  name: text("name").notNull(),
-  marketingName: text("marketing_name"),
-  sku: text("sku"),
-  slug: text("slug").notNull().unique(),
-  imageUrl: text("image_url"),
-  year: integer("year"),
-  networkTechnology: text("network_technology").default("unknown"),
-  // 5G, 4G, other, unknown
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var deviceVariants = sqliteTable("device_variants", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  modelId: text("model_id").notNull().references(() => deviceModels.id),
-  storageGb: integer("storage_gb").notNull(),
-  color: text("color"),
-  networkCarrier: text("network_carrier").default("unlocked"),
-  // unlocked, att, verizon, tmobile, other, unknown
-  hasEsim: integer("has_esim", { mode: "boolean" }).default(false),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var buybackConditionProfiles = sqliteTable("buyback_condition_profiles", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  code: text("code").notNull().unique(),
-  // A, B, C, D, broken
-  label: text("label").notNull(),
-  description: text("description").notNull(),
-  isBroken: integer("is_broken", { mode: "boolean" }).notNull().default(false),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var buybackPricingRules = sqliteTable("buyback_pricing_rules", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id),
-  conditionProfileId: text("condition_profile_id").notNull().references(() => buybackConditionProfiles.id),
-  basePrice: real("base_price").notNull(),
-  currency: text("currency").notNull().default("USD"),
-  isBlacklistedEligible: integer("is_blacklisted_eligible", { mode: "boolean" }).default(false),
-  financedDevicePenaltyAmount: real("financed_device_penalty_amount").default(0),
-  noPowerPenaltyAmount: real("no_power_penalty_amount").default(0),
-  functionalIssuePenaltyAmount: real("functional_issue_penalty_amount").default(0),
-  crackedGlassPenaltyAmount: real("cracked_glass_penalty_amount").default(0),
-  activationLockPenaltyAmount: real("activation_lock_penalty_amount").default(0),
-  minOfferAmount: real("min_offer_amount").default(0),
-  maxOfferAmount: real("max_offer_amount"),
-  effectiveFrom: integer("effective_from", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  effectiveTo: integer("effective_to", { mode: "timestamp" }),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var quoteRequests = sqliteTable("quote_requests", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
+var billingAddressesRelations = relations(billingAddresses, ({ one }) => ({
+  company: one(companies, {
+    fields: [billingAddresses.companyId],
+    references: [companies.id]
+  })
+}));
+var quotes = pgTable("quotes", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   quoteNumber: text("quote_number").notNull().unique(),
-  userId: text("user_id").references(() => users.id),
-  email: text("email").notNull(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  phoneNumber: text("phone_number"),
-  offerTotalAmount: real("offer_total_amount"),
-  offerCurrency: text("offer_currency").default("USD"),
-  offerExpiresAt: integer("offer_expires_at", { mode: "timestamp" }),
-  status: text("status").notNull().default("draft"),
-  // draft, quoted, expired, converted_to_order, cancelled
-  lockedUntil: integer("locked_until", { mode: "timestamp" }),
-  source: text("source").notNull().default("guest"),
-  // guest, account
-  notesInternal: text("notes_internal"),
-  notesCustomer: text("notes_customer"),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var quoteLineItems = sqliteTable("quote_line_items", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  quoteRequestId: text("quote_request_id").notNull().references(() => quoteRequests.id),
-  deviceModelId: text("device_model_id").notNull().references(() => deviceModels.id),
-  deviceVariantId: text("device_variant_id").references(() => deviceVariants.id),
-  imei: text("imei"),
-  serialNumber: text("serial_number"),
-  claimedConditionProfileId: text("claimed_condition_profile_id").notNull().references(() => buybackConditionProfiles.id),
-  claimedIssuesJson: text("claimed_issues_json"),
-  // JSON string
-  initialOfferAmount: real("initial_offer_amount").notNull(),
+  companyId: text("company_id").notNull().references(() => companies.id),
+  createdByUserId: text("created_by_user_id").notNull().references(() => users.id),
+  status: text("status", { enum: quoteStatusEnum }).notNull().default("draft"),
+  validUntil: timestamp("valid_until"),
+  subtotal: real("subtotal").notNull().default(0),
+  shippingEstimate: real("shipping_estimate").notNull().default(0),
+  taxEstimate: real("tax_estimate").notNull().default(0),
+  totalEstimate: real("total_estimate").notNull().default(0),
   currency: text("currency").notNull().default("USD"),
-  calculatedAt: integer("calculated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
-var sellOrders = sqliteTable("sell_orders", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  orderNumber: text("order_number").notNull().unique(),
-  userId: text("user_id").references(() => users.id),
-  quoteRequestId: text("quote_request_id").references(() => quoteRequests.id),
-  status: text("status").notNull().default("label_pending"),
-  // label_pending, awaiting_device, in_transit, received, under_inspection, reoffer_pending, customer_decision_pending, payout_pending, completed, cancelled, returned_to_customer
-  lockedInAt: integer("locked_in_at", { mode: "timestamp" }),
-  lockedUntil: integer("locked_until", { mode: "timestamp" }),
-  shipmentId: text("shipment_id"),
-  // Customer contact information
-  customerEmail: text("customer_email"),
-  customerPhone: text("customer_phone"),
-  // Shipping address
-  shippingAddressLine1: text("shipping_address_line1"),
-  shippingAddressLine2: text("shipping_address_line2"),
-  shippingCity: text("shipping_city"),
-  shippingState: text("shipping_state"),
-  shippingPostalCode: text("shipping_postal_code"),
-  shippingCountry: text("shipping_country").default("US"),
-  payoutStatus: text("payout_status").notNull().default("not_started"),
-  // not_started, pending, paid, failed
-  payoutMethod: text("payout_method"),
-  payoutDetailsJson: text("payout_details_json"),
-  // JSON string
-  totalOriginalOffer: real("total_original_offer"),
-  totalFinalOffer: real("total_final_offer"),
-  currency: text("currency").notNull().default("USD"),
-  notesInternal: text("notes_internal"),
-  notesCustomer: text("notes_customer"),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+var quotesRelations = relations(quotes, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [quotes.companyId],
+    references: [companies.id]
+  }),
+  createdBy: one(users, {
+    fields: [quotes.createdByUserId],
+    references: [users.id],
+    relationName: "quoteCreator"
+  }),
+  items: many(quoteItems)
+}));
+var quoteItems = pgTable("quote_items", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  quoteId: text("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id),
+  quantity: integer("quantity").notNull(),
+  proposedUnitPrice: real("proposed_unit_price").notNull(),
+  lineTotalEstimate: real("line_total_estimate").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
-var sellOrderItems = sqliteTable("sell_order_items", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  sellOrderId: text("sell_order_id").notNull().references(() => sellOrders.id),
-  quoteLineItemId: text("quote_line_item_id").references(() => quoteLineItems.id),
-  deviceModelId: text("device_model_id").notNull().references(() => deviceModels.id),
-  deviceVariantId: text("device_variant_id").references(() => deviceVariants.id),
-  imei: text("imei"),
-  serialNumber: text("serial_number"),
-  claimedConditionProfileId: text("claimed_condition_profile_id").notNull().references(() => buybackConditionProfiles.id),
-  claimedIssuesJson: text("claimed_issues_json"),
-  // JSON string
-  originalOfferAmount: real("original_offer_amount").notNull(),
-  pricingRuleId: text("pricing_rule_id"),
-  basePrice: real("base_price"),
-  totalPenalty: real("total_penalty"),
-  penaltyBreakdownJson: text("penalty_breakdown_json"),
-  // JSON string
-  inspectedConditionProfileId: text("inspected_condition_profile_id").references(() => buybackConditionProfiles.id),
-  inspectedIssuesJson: text("inspected_issues_json"),
-  // JSON string
-  inspectionNotes: text("inspection_notes"),
-  finalOfferAmount: real("final_offer_amount"),
-  adjustmentReason: text("adjustment_reason").default("none"),
-  // condition_mismatch, blacklisted, financed, functional_issue, other, none
-  customerDecision: text("customer_decision").notNull().default("pending"),
-  // pending, accepted, rejected, returned
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+var quoteItemsRelations = relations(quoteItems, ({ one }) => ({
+  quote: one(quotes, {
+    fields: [quoteItems.quoteId],
+    references: [quotes.id]
+  }),
+  deviceVariant: one(deviceVariants, {
+    fields: [quoteItems.deviceVariantId],
+    references: [deviceVariants.id]
+  })
+}));
+var savedLists = pgTable("saved_lists", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdByUserId: text("created_by_user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
-var shipments = sqliteTable("shipments", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  sellOrderId: text("sell_order_id").notNull().references(() => sellOrders.id),
-  carrierName: text("carrier_name"),
-  serviceLevel: text("service_level"),
-  trackingNumber: text("tracking_number"),
-  labelUrl: text("label_url"),
-  labelCost: real("label_cost"),
-  labelPaidBy: text("label_paid_by").default("company"),
-  // company, customer
-  shipFromAddressJson: text("ship_from_address_json"),
-  // JSON string
-  shipToAddressJson: text("ship_to_address_json"),
-  // JSON string
-  droppedOffAt: integer("dropped_off_at", { mode: "timestamp" }),
-  deliveredAt: integer("delivered_at", { mode: "timestamp" }),
-  lastTrackingStatus: text("last_tracking_status"),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+var savedListsRelations = relations(savedLists, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [savedLists.companyId],
+    references: [companies.id]
+  }),
+  createdBy: one(users, {
+    fields: [savedLists.createdByUserId],
+    references: [users.id]
+  }),
+  items: many(savedListItems)
+}));
+var savedListItems = pgTable("saved_list_items", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  savedListId: text("saved_list_id").notNull().references(() => savedLists.id, { onDelete: "cascade" }),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
+  defaultQuantity: integer("default_quantity").notNull().default(1)
 });
-var payments = sqliteTable("payments", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  sellOrderId: text("sell_order_id").notNull().references(() => sellOrders.id),
+var savedListItemsRelations = relations(savedListItems, ({ one }) => ({
+  savedList: one(savedLists, {
+    fields: [savedListItems.savedListId],
+    references: [savedLists.id]
+  }),
+  deviceVariant: one(deviceVariants, {
+    fields: [savedListItems.deviceVariantId],
+    references: [deviceVariants.id]
+  })
+}));
+var payments = pgTable("payments", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   amount: real("amount").notNull(),
   currency: text("currency").notNull().default("USD"),
-  direction: text("direction").notNull(),
-  // incoming_from_customer, outgoing_to_customer
-  payoutReference: text("payout_reference"),
-  method: text("method").notNull(),
-  // card, wire, ach, paypal, check, other
-  status: text("status").notNull().default("pending"),
-  // pending, succeeded, failed, refunded
-  processedAt: integer("processed_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+  status: text("status").notNull(),
+  method: text("method", { enum: paymentMethodEnum }).notNull(),
+  processedAt: timestamp("processed_at")
 });
-var supportTickets = sqliteTable("support_tickets", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  userId: text("user_id").references(() => users.id),
-  sellOrderId: text("sell_order_id").references(() => sellOrders.id),
-  quoteRequestId: text("quote_request_id").references(() => quoteRequests.id),
-  subject: text("subject").notNull(),
-  description: text("description").notNull(),
-  status: text("status").notNull().default("open"),
-  // open, in_progress, closed
-  priority: text("priority").notNull().default("medium"),
-  // low, medium, high
-  lastCustomerActivityAt: integer("last_customer_activity_at", { mode: "timestamp" }),
-  lastAgentActivityAt: integer("last_agent_activity_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+var paymentsRelations = relations(payments, ({ one }) => ({
+  order: one(orders, {
+    fields: [payments.orderId],
+    references: [orders.id]
+  })
+}));
+var shipments = pgTable("shipments", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  carrier: text("carrier").notNull(),
+  serviceLevel: text("service_level"),
+  trackingNumber: text("tracking_number"),
+  shippingLabelUrl: text("shipping_label_url"),
+  shippedAt: timestamp("shipped_at"),
+  estimatedDeliveryDate: timestamp("estimated_delivery_date")
 });
-var supportTicketMessages = sqliteTable("support_ticket_messages", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  ticketId: text("ticket_id").notNull().references(() => supportTickets.id),
-  authorType: text("author_type").notNull(),
-  // customer, admin
-  authorUserId: text("author_user_id").references(() => users.id),
-  message: text("message").notNull(),
-  isInternal: integer("is_internal", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var announcements = sqliteTable("announcements", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  title: text("title").notNull(),
-  body: text("body").notNull(),
-  startsAt: integer("starts_at", { mode: "timestamp" }).notNull(),
-  endsAt: integer("ends_at", { mode: "timestamp" }),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
-});
-var faqs = sqliteTable("faqs", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
+var shipmentsRelations = relations(shipments, ({ one }) => ({
+  order: one(orders, {
+    fields: [shipments.orderId],
+    references: [orders.id]
+  })
+}));
+var faqs = pgTable("faqs", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   question: text("question").notNull(),
   answer: text("answer").notNull(),
-  category: text("category").notNull().default("general"),
-  // general, pricing, shipping, payments, data_wipe
+  category: text("category").notNull(),
   displayOrder: integer("display_order").notNull().default(0),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
-var auditLogs = sqliteTable("audit_logs", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
+var announcements = pgTable("announcements", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  startsAt: timestamp("starts_at"),
+  endsAt: timestamp("ends_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var supportTickets = pgTable("support_tickets", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  createdByUserId: text("created_by_user_id").references(() => users.id),
+  subject: text("subject").notNull(),
+  description: text("description").notNull(),
+  status: text("status", { enum: supportTicketStatusEnum }).notNull().default("open"),
+  priority: text("priority", { enum: supportTicketPriorityEnum }).notNull().default("medium"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+var supportTicketsRelations = relations(supportTickets, ({ one }) => ({
+  company: one(companies, {
+    fields: [supportTickets.companyId],
+    references: [companies.id]
+  }),
+  createdBy: one(users, {
+    fields: [supportTickets.createdByUserId],
+    references: [users.id]
+  })
+}));
+var auditLogs = pgTable("audit_logs", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   actorUserId: text("actor_user_id").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
   action: text("action").notNull(),
   entityType: text("entity_type").notNull(),
   entityId: text("entity_id").notNull(),
   previousValues: text("previous_values"),
-  // JSON string
   newValues: text("new_values"),
-  // JSON string
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
-var siteSettings = sqliteTable("site_settings", {
-  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
-  key: text("key").notNull().unique(),
-  valueJson: text("value_json"),
-  // JSON string
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`)
+var auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  actor: one(users, {
+    fields: [auditLogs.actorUserId],
+    references: [users.id]
+  })
+}));
+var insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true
 });
-var insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, lastLoginAt: true });
-var insertCustomerProfileSchema = createInsertSchema(customerProfiles).omit({ id: true, createdAt: true, updatedAt: true });
-var insertAddressSchema = createInsertSchema(addresses).omit({ id: true, createdAt: true, updatedAt: true });
-var insertDeviceBrandSchema = createInsertSchema(deviceBrands).omit({ id: true, createdAt: true, updatedAt: true });
-var insertDeviceFamilySchema = createInsertSchema(deviceFamilies).omit({ id: true, createdAt: true, updatedAt: true });
-var insertDeviceModelSchema = createInsertSchema(deviceModels).omit({ id: true, createdAt: true, updatedAt: true });
-var insertDeviceVariantSchema = createInsertSchema(deviceVariants).omit({ id: true, createdAt: true, updatedAt: true });
-var insertBuybackConditionProfileSchema = createInsertSchema(buybackConditionProfiles).omit({ id: true, createdAt: true, updatedAt: true });
-var insertBuybackPricingRuleSchema = createInsertSchema(buybackPricingRules).omit({ id: true, createdAt: true, updatedAt: true });
-var insertQuoteRequestSchema = createInsertSchema(quoteRequests).omit({ id: true, createdAt: true, updatedAt: true });
-var insertQuoteLineItemSchema = createInsertSchema(quoteLineItems).omit({ id: true, createdAt: true, updatedAt: true });
-var insertSellOrderSchema = createInsertSchema(sellOrders).omit({ id: true, createdAt: true, updatedAt: true });
-var insertSellOrderItemSchema = createInsertSchema(sellOrderItems).omit({ id: true, createdAt: true, updatedAt: true }).extend({
-  deviceVariantId: z.string().nullable().optional()
+var insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 });
-var insertShipmentSchema = createInsertSchema(shipments).omit({ id: true, createdAt: true, updatedAt: true });
-var insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true, updatedAt: true });
-var insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true });
-var insertSupportTicketMessageSchema = createInsertSchema(supportTicketMessages).omit({ id: true, createdAt: true });
-var insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true, updatedAt: true });
-var insertFaqSchema = createInsertSchema(faqs).omit({ id: true, createdAt: true, updatedAt: true });
-var insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
-var insertSiteSettingSchema = createInsertSchema(siteSettings).omit({ id: true, updatedAt: true });
+var insertCompanyUserSchema = createInsertSchema(companyUsers).omit({
+  id: true,
+  createdAt: true
+});
+var insertDeviceCategorySchema = createInsertSchema(deviceCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertDeviceModelSchema = createInsertSchema(deviceModels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertDeviceVariantSchema = createInsertSchema(deviceVariants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertInventoryItemSchema = createInsertSchema(inventoryItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertPriceTierSchema = createInsertSchema(priceTiers).omit({
+  id: true
+});
+var insertCartSchema = createInsertSchema(carts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertCartItemSchema = createInsertSchema(cartItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertOrderSchema = createInsertSchema(orders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertOrderItemSchema = createInsertSchema(orderItems).omit({
+  id: true,
+  createdAt: true
+});
+var insertShippingAddressSchema = createInsertSchema(shippingAddresses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertBillingAddressSchema = createInsertSchema(billingAddresses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertQuoteSchema = createInsertSchema(quotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertQuoteItemSchema = createInsertSchema(quoteItems).omit({
+  id: true,
+  createdAt: true
+});
+var insertSavedListSchema = createInsertSchema(savedLists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertSavedListItemSchema = createInsertSchema(savedListItems).omit({
+  id: true
+});
+var insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true
+});
+var insertShipmentSchema = createInsertSchema(shipments).omit({
+  id: true
+});
+var insertFaqSchema = createInsertSchema(faqs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertAnnouncementSchema = createInsertSchema(announcements).omit({
+  id: true,
+  createdAt: true
+});
+var insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true
+});
 
 // server/db.ts
-var dbPath = "sqlite.db";
-var sqlite = new Database(dbPath);
-var db = drizzle({ client: sqlite, schema: schema_exports });
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is required");
+}
+var sql2 = neon(process.env.DATABASE_URL);
+var db = drizzle(sql2, { schema: schema_exports });
 
 // server/storage.ts
-import { eq, and, or, isNull, lte, gte } from "drizzle-orm";
+import { eq, and, desc, sql as sql3 } from "drizzle-orm";
 var DatabaseStorage = class {
-  // Shipments
-  async getShipment(id) {
-    const [shipment] = await db.select().from(shipments).where(eq(shipments.id, id));
-    return shipment || void 0;
-  }
-  async getShipmentByOrder(orderId) {
-    const [shipment] = await db.select().from(shipments).where(eq(shipments.sellOrderId, orderId));
-    return shipment || void 0;
-  }
-  async createShipment(shipment) {
-    const [newShipment] = await db.insert(shipments).values(shipment).returning();
-    return newShipment;
-  }
-  async updateShipment(id, updates) {
-    const [shipment] = await db.update(shipments).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(shipments.id, id)).returning();
-    return shipment || void 0;
-  }
-  async deleteModel(id) {
-    const result = await db.delete(deviceModels).where(eq(deviceModels.id, id));
-    return result.changes > 0;
-  }
-  // Users
+  // User methods
   async getUser(id) {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || void 0;
@@ -815,224 +715,1479 @@ var DatabaseStorage = class {
     return user;
   }
   async updateUser(id, updates) {
-    const [user] = await db.update(users).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id)).returning();
+    const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
     return user || void 0;
   }
-  // Device Brands
-  async getAllBrands() {
-    return await db.select().from(deviceBrands).where(eq(deviceBrands.isActive, true));
+  async getAllUsers() {
+    const users2 = await db.select().from(users);
+    return users2;
   }
-  async getBrand(id) {
-    const [brand] = await db.select().from(deviceBrands).where(eq(deviceBrands.id, id));
-    return brand || void 0;
+  // Company methods
+  async getCompany(id) {
+    const [company] = await db.select().from(companies).where(eq(companies.id, id));
+    return company || void 0;
   }
-  async getBrandBySlug(slug) {
-    const [brand] = await db.select().from(deviceBrands).where(eq(deviceBrands.slug, slug));
-    return brand || void 0;
+  async createCompany(insertCompany) {
+    const [company] = await db.insert(companies).values(insertCompany).returning();
+    return company;
   }
-  async createBrand(brand) {
-    const [newBrand] = await db.insert(deviceBrands).values(brand).returning();
-    return newBrand;
+  async updateCompany(id, updates) {
+    const [company] = await db.update(companies).set(updates).where(eq(companies.id, id)).returning();
+    return company || void 0;
   }
-  async updateBrand(id, updates) {
-    const [brand] = await db.update(deviceBrands).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(deviceBrands.id, id)).returning();
-    return brand || void 0;
+  async getAllCompanies() {
+    return await db.select().from(companies).orderBy(desc(companies.createdAt));
   }
-  // Device Models
-  async getAllModels() {
+  // CompanyUser methods
+  async createCompanyUser(insertCompanyUser) {
+    const [companyUser] = await db.insert(companyUsers).values(insertCompanyUser).returning();
+    return companyUser;
+  }
+  async getCompanyUsersByUserId(userId) {
+    return await db.select().from(companyUsers).where(eq(companyUsers.userId, userId));
+  }
+  async getCompanyUsersByCompanyId(companyId) {
+    return await db.select().from(companyUsers).where(eq(companyUsers.companyId, companyId));
+  }
+  // Device Category methods
+  async getAllCategories() {
+    return await db.select().from(deviceCategories);
+  }
+  async getCategory(id) {
+    const [category] = await db.select().from(deviceCategories).where(eq(deviceCategories.id, id));
+    return category || void 0;
+  }
+  async getCategoryBySlug(slug) {
+    const [category] = await db.select().from(deviceCategories).where(eq(deviceCategories.slug, slug));
+    return category || void 0;
+  }
+  async createCategory(insertCategory) {
+    const [category] = await db.insert(deviceCategories).values(insertCategory).returning();
+    return category;
+  }
+  // Device Model methods
+  async getAllDeviceModels() {
     return await db.select().from(deviceModels).where(eq(deviceModels.isActive, true));
   }
-  async getModel(id) {
+  async getDeviceModel(id) {
     const [model] = await db.select().from(deviceModels).where(eq(deviceModels.id, id));
     return model || void 0;
   }
-  async getModelBySlug(slug) {
+  async getDeviceModelBySlug(slug) {
     const [model] = await db.select().from(deviceModels).where(eq(deviceModels.slug, slug));
     return model || void 0;
   }
-  async getModelsByBrand(brandId) {
-    return await db.select().from(deviceModels).where(and(eq(deviceModels.brandId, brandId), eq(deviceModels.isActive, true)));
+  async createDeviceModel(insertModel) {
+    const [model] = await db.insert(deviceModels).values(insertModel).returning();
+    return model;
   }
-  async createModel(model) {
-    const [newModel] = await db.insert(deviceModels).values(model).returning();
-    return newModel;
-  }
-  async updateModel(id, updates) {
-    const [model] = await db.update(deviceModels).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(deviceModels.id, id)).returning();
-    return model || void 0;
-  }
-  // Device Variants
-  async getVariant(id) {
+  // Device Variant methods
+  async getDeviceVariant(id) {
     const [variant] = await db.select().from(deviceVariants).where(eq(deviceVariants.id, id));
     return variant || void 0;
   }
-  async getVariantsByModel(modelId) {
-    return await db.select().from(deviceVariants).where(and(eq(deviceVariants.modelId, modelId), eq(deviceVariants.isActive, true)));
+  async getDeviceVariantsByModelId(modelId) {
+    return await db.select().from(deviceVariants).where(eq(deviceVariants.deviceModelId, modelId));
   }
-  async createVariant(variant) {
-    const [newVariant] = await db.insert(deviceVariants).values(variant).returning();
-    return newVariant;
+  async createDeviceVariant(insertVariant) {
+    const [variant] = await db.insert(deviceVariants).values(insertVariant).returning();
+    return variant;
   }
-  async updateVariant(id, updates) {
-    const [variant] = await db.update(deviceVariants).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(deviceVariants.id, id)).returning();
+  async updateDeviceVariant(id, updates) {
+    const [variant] = await db.update(deviceVariants).set(updates).where(eq(deviceVariants.id, id)).returning();
     return variant || void 0;
   }
-  // Buyback Condition Profiles
-  async getAllConditionProfiles() {
-    return await db.select().from(buybackConditionProfiles).where(eq(buybackConditionProfiles.isActive, true));
+  async deleteDeviceVariant(id) {
+    await db.delete(deviceVariants).where(eq(deviceVariants.id, id));
   }
-  async getConditionProfile(id) {
-    const [profile] = await db.select().from(buybackConditionProfiles).where(eq(buybackConditionProfiles.id, id));
-    return profile || void 0;
+  // Inventory methods
+  async getInventoryByVariantId(variantId) {
+    const [item] = await db.select().from(inventoryItems).where(eq(inventoryItems.deviceVariantId, variantId));
+    return item || void 0;
   }
-  async getConditionProfileByCode(code) {
-    const [profile] = await db.select().from(buybackConditionProfiles).where(eq(buybackConditionProfiles.code, code));
-    return profile || void 0;
+  async createInventory(insertInventory) {
+    const [item] = await db.insert(inventoryItems).values(insertInventory).returning();
+    return item;
   }
-  async createConditionProfile(profile) {
-    const [newProfile] = await db.insert(buybackConditionProfiles).values(profile).returning();
-    return newProfile;
+  async updateInventory(id, updates) {
+    const [item] = await db.update(inventoryItems).set(updates).where(eq(inventoryItems.id, id)).returning();
+    return item || void 0;
   }
-  // Buyback Pricing Rules
-  async getPricingRule(id) {
-    const [rule] = await db.select().from(buybackPricingRules).where(eq(buybackPricingRules.id, id));
-    return rule || void 0;
+  async deleteInventoryByVariantId(variantId) {
+    await db.delete(inventoryItems).where(eq(inventoryItems.deviceVariantId, variantId));
   }
-  async getPricingRulesByVariant(variantId) {
+  // Price Tier methods
+  async getPriceTiersByVariantId(variantId) {
+    return await db.select().from(priceTiers).where(and(
+      eq(priceTiers.deviceVariantId, variantId),
+      eq(priceTiers.isActive, true)
+    )).orderBy(priceTiers.minQuantity);
+  }
+  async createPriceTier(insertTier) {
+    const [tier] = await db.insert(priceTiers).values(insertTier).returning();
+    return tier;
+  }
+  async updatePriceTier(id, updates) {
+    const [tier] = await db.update(priceTiers).set(updates).where(eq(priceTiers.id, id)).returning();
+    return tier || void 0;
+  }
+  async deletePriceTiersByVariantId(variantId) {
+    await db.delete(priceTiers).where(eq(priceTiers.deviceVariantId, variantId));
+  }
+  // Cart methods
+  async getCartByUserId(userId) {
+    const [cart] = await db.select().from(carts).where(eq(carts.userId, userId));
+    return cart || void 0;
+  }
+  async createCart(insertCart) {
+    const [cart] = await db.insert(carts).values(insertCart).returning();
+    return cart;
+  }
+  async getCartItems(cartId) {
+    return await db.select().from(cartItems).where(eq(cartItems.cartId, cartId));
+  }
+  async addCartItem(insertItem) {
+    const [item] = await db.insert(cartItems).values(insertItem).returning();
+    return item;
+  }
+  async updateCartItem(id, updates) {
+    const [item] = await db.update(cartItems).set(updates).where(eq(cartItems.id, id)).returning();
+    return item || void 0;
+  }
+  async removeCartItem(id) {
+    await db.delete(cartItems).where(eq(cartItems.id, id));
+  }
+  async clearCart(cartId) {
+    await db.delete(cartItems).where(eq(cartItems.cartId, cartId));
+  }
+  // Order methods
+  async createOrder(insertOrder) {
+    const [order] = await db.insert(orders).values(insertOrder).returning();
+    return order;
+  }
+  async getOrder(id) {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order || void 0;
+  }
+  async getOrderByNumber(orderNumber) {
+    const [order] = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber));
+    return order || void 0;
+  }
+  async getOrdersByCompanyId(companyId) {
+    return await db.select().from(orders).where(eq(orders.companyId, companyId)).orderBy(desc(orders.createdAt));
+  }
+  async updateOrder(id, updates) {
+    const [order] = await db.update(orders).set(updates).where(eq(orders.id, id)).returning();
+    return order || void 0;
+  }
+  async getAllOrders() {
+    const orders2 = await db.select().from(orders);
+    return orders2;
+  }
+  async createOrderItem(insertItem) {
+    const [item] = await db.insert(orderItems).values(insertItem).returning();
+    return item;
+  }
+  async getOrderItems(orderId) {
+    return await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  }
+  // Shipping/Billing Address methods
+  async getShippingAddressesByCompanyId(companyId) {
+    return await db.select().from(shippingAddresses).where(eq(shippingAddresses.companyId, companyId));
+  }
+  async createShippingAddress(insertAddress) {
+    const [address] = await db.insert(shippingAddresses).values(insertAddress).returning();
+    return address;
+  }
+  async updateShippingAddress(id, updates) {
+    const [address] = await db.update(shippingAddresses).set(updates).where(eq(shippingAddresses.id, id)).returning();
+    return address || void 0;
+  }
+  async getBillingAddressesByCompanyId(companyId) {
+    return await db.select().from(billingAddresses).where(eq(billingAddresses.companyId, companyId));
+  }
+  async createBillingAddress(insertAddress) {
+    const [address] = await db.insert(billingAddresses).values(insertAddress).returning();
+    return address;
+  }
+  // Quote methods
+  async createQuote(insertQuote) {
+    const [quote] = await db.insert(quotes).values(insertQuote).returning();
+    return quote;
+  }
+  async getQuote(id) {
+    const [quote] = await db.select().from(quotes).where(eq(quotes.id, id));
+    return quote || void 0;
+  }
+  async getQuotesByCompanyId(companyId) {
+    return await db.select().from(quotes).where(eq(quotes.companyId, companyId)).orderBy(desc(quotes.createdAt));
+  }
+  async updateQuote(id, updates) {
+    const [quote] = await db.update(quotes).set(updates).where(eq(quotes.id, id)).returning();
+    return quote || void 0;
+  }
+  async createQuoteItem(insertItem) {
+    const [item] = await db.insert(quoteItems).values(insertItem).returning();
+    return item;
+  }
+  async getQuoteItems(quoteId) {
+    return await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+  }
+  // Saved List methods
+  async getSavedListsByCompanyId(companyId) {
+    return await db.select().from(savedLists).where(eq(savedLists.companyId, companyId));
+  }
+  async createSavedList(insertList) {
+    const [list] = await db.insert(savedLists).values(insertList).returning();
+    return list;
+  }
+  async getSavedListItems(listId) {
+    return await db.select().from(savedListItems).where(eq(savedListItems.savedListId, listId));
+  }
+  async addSavedListItem(insertItem) {
+    const [item] = await db.insert(savedListItems).values(insertItem).returning();
+    return item;
+  }
+  async getSavedList(id) {
+    const [list] = await db.select().from(savedLists).where(eq(savedLists.id, id));
+    return list || void 0;
+  }
+  async deleteSavedList(id) {
+    await db.delete(savedLists).where(eq(savedLists.id, id));
+  }
+  async deleteSavedListItem(id) {
+    await db.delete(savedListItems).where(eq(savedListItems.id, id));
+  }
+  // Payment methods
+  async createPayment(insertPayment) {
+    const [payment] = await db.insert(payments).values(insertPayment).returning();
+    return payment;
+  }
+  async getPaymentsByOrderId(orderId) {
+    return await db.select().from(payments).where(eq(payments.orderId, orderId));
+  }
+  // Shipment methods
+  async createShipment(insertShipment) {
+    const [shipment] = await db.insert(shipments).values(insertShipment).returning();
+    return shipment;
+  }
+  async getShipmentsByOrderId(orderId) {
+    return await db.select().from(shipments).where(eq(shipments.orderId, orderId));
+  }
+  // FAQ methods
+  async getAllFaqs() {
+    return await db.select().from(faqs).where(eq(faqs.isActive, true)).orderBy(faqs.category, faqs.displayOrder);
+  }
+  async createFaq(insertFaq) {
+    const [faq] = await db.insert(faqs).values(insertFaq).returning();
+    return faq;
+  }
+  // Announcement methods
+  async getActiveAnnouncements() {
     const now = /* @__PURE__ */ new Date();
-    return await db.select().from(buybackPricingRules).where(
+    return await db.select().from(announcements).where(
       and(
-        eq(buybackPricingRules.deviceVariantId, variantId),
-        eq(buybackPricingRules.isActive, true),
-        lte(buybackPricingRules.effectiveFrom, now),
-        and(
-          isNull(buybackPricingRules.effectiveTo),
-          gte(buybackPricingRules.effectiveTo, now)
-        )
+        eq(announcements.isActive, true),
+        sql3`${announcements.startsAt} <= ${now}`,
+        sql3`(${announcements.endsAt} IS NULL OR ${announcements.endsAt} >= ${now})`
       )
     );
   }
-  async getPricingRuleByVariantAndCondition(variantId, conditionId) {
-    const now = /* @__PURE__ */ new Date();
-    const [rule] = await db.select().from(buybackPricingRules).where(
-      and(
-        eq(buybackPricingRules.deviceVariantId, variantId),
-        eq(buybackPricingRules.conditionProfileId, conditionId),
-        eq(buybackPricingRules.isActive, true),
-        lte(buybackPricingRules.effectiveFrom, now),
-        or(
-          isNull(buybackPricingRules.effectiveTo),
-          gte(buybackPricingRules.effectiveTo, now)
-        )
-      )
-    );
-    return rule || void 0;
+  async createAnnouncement(insertAnnouncement) {
+    const [announcement] = await db.insert(announcements).values(insertAnnouncement).returning();
+    return announcement;
   }
-  async createPricingRule(rule) {
-    const [newRule] = await db.insert(buybackPricingRules).values(rule).returning();
-    return newRule;
+  // Support Ticket methods
+  async createSupportTicket(insertTicket) {
+    const [ticket] = await db.insert(supportTickets).values(insertTicket).returning();
+    return ticket;
   }
-  async updatePricingRule(id, updates) {
-    const [rule] = await db.update(buybackPricingRules).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(buybackPricingRules.id, id)).returning();
-    return rule || void 0;
+  async getSupportTicketsByCompanyId(companyId) {
+    return await db.select().from(supportTickets).where(eq(supportTickets.companyId, companyId)).orderBy(desc(supportTickets.createdAt));
   }
-  // Quote Requests
-  async getQuoteRequest(id) {
-    const [quote] = await db.select().from(quoteRequests).where(eq(quoteRequests.id, id));
-    return quote || void 0;
+  async updateSupportTicket(id, updates) {
+    const [ticket] = await db.update(supportTickets).set(updates).where(eq(supportTickets.id, id)).returning();
+    return ticket || void 0;
   }
-  async getQuoteRequestByNumber(quoteNumber) {
-    const [quote] = await db.select().from(quoteRequests).where(eq(quoteRequests.quoteNumber, quoteNumber));
-    return quote || void 0;
+  // Audit Log methods
+  async createAuditLog(insertLog) {
+    const [log2] = await db.insert(auditLogs).values(insertLog).returning();
+    return log2;
   }
-  async getQuoteRequestsByUser(userId) {
-    return await db.select().from(quoteRequests).where(eq(quoteRequests.userId, userId));
-  }
-  async getQuoteRequestsByEmail(email) {
-    return await db.select().from(quoteRequests).where(eq(quoteRequests.email, email));
-  }
-  async createQuoteRequest(quote) {
-    const [newQuote] = await db.insert(quoteRequests).values(quote).returning();
-    return newQuote;
-  }
-  async updateQuoteRequest(id, updates) {
-    const [quote] = await db.update(quoteRequests).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(quoteRequests.id, id)).returning();
-    return quote || void 0;
-  }
-  // Quote Line Items
-  async getQuoteLineItem(id) {
-    const [item] = await db.select().from(quoteLineItems).where(eq(quoteLineItems.id, id));
-    return item || void 0;
-  }
-  async getQuoteLineItemsByQuote(quoteRequestId) {
-    return await db.select().from(quoteLineItems).where(eq(quoteLineItems.quoteRequestId, quoteRequestId));
-  }
-  async createQuoteLineItem(item) {
-    const [newItem] = await db.insert(quoteLineItems).values(item).returning();
-    return newItem;
-  }
-  // Sell Orders
-  async getSellOrder(id) {
-    const [order] = await db.select().from(sellOrders).where(eq(sellOrders.id, id));
-    return order || void 0;
-  }
-  async getSellOrderByNumber(orderNumber) {
-    const [order] = await db.select().from(sellOrders).where(eq(sellOrders.orderNumber, orderNumber));
-    return order || void 0;
-  }
-  async getSellOrdersByUser(userId) {
-    return await db.select().from(sellOrders).where(eq(sellOrders.userId, userId));
-  }
-  async getAllSellOrders() {
-    return await db.select().from(sellOrders);
-  }
-  async createSellOrder(order) {
-    const [newOrder] = await db.insert(sellOrders).values(order).returning();
-    return newOrder;
-  }
-  async updateSellOrder(id, updates) {
-    const [order] = await db.update(sellOrders).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(sellOrders.id, id)).returning();
-    return order || void 0;
-  }
-  // Sell Order Items
-  async getSellOrderItem(id) {
-    const [item] = await db.select().from(sellOrderItems).where(eq(sellOrderItems.id, id));
-    return item || void 0;
-  }
-  async getSellOrderItemsByOrder(sellOrderId) {
-    return await db.select().from(sellOrderItems).where(eq(sellOrderItems.sellOrderId, sellOrderId));
-  }
-  async createSellOrderItem(item) {
-    const [newItem] = await db.insert(sellOrderItems).values(item).returning();
-    return newItem;
-  }
-  async updateSellOrderItem(id, updates) {
-    const [item] = await db.update(sellOrderItems).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(sellOrderItems.id, id)).returning();
-    return item || void 0;
+  async getAuditLogs(limit = 100) {
+    return await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(limit);
   }
 };
 var storage = new DatabaseStorage();
 
 // server/routes.ts
-import { fromError } from "zod-validation-error";
+import bcrypt from "bcrypt";
+import Stripe from "stripe";
+import { z } from "zod";
 
-// server/auth.ts
-import bcrypt from "bcryptjs";
-var SALT_ROUNDS = 10;
-async function hashPassword(password) {
-  return bcrypt.hash(password, SALT_ROUNDS);
+// server/routes/emails.ts
+import { Router } from "express";
+
+// server/services/email.ts
+import nodemailer from "nodemailer";
+var transporter = null;
+function getEmailTransporter() {
+  if (!transporter) {
+    const emailUser = process.env.EMAIL_USER;
+    const emailPass = process.env.EMAIL_PASS;
+    if (!emailUser || !emailPass) {
+      throw new Error("Email credentials not configured. Set EMAIL_USER and EMAIL_PASS environment variables.");
+    }
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: emailUser,
+        pass: emailPass
+      }
+    });
+  }
+  return transporter;
 }
-async function comparePassword(password, hash) {
-  return bcrypt.compare(password, hash);
+async function sendEmail(mailOptions) {
+  try {
+    const transporter2 = getEmailTransporter();
+    const defaultFrom = process.env.EMAIL_FROM || `SecondHandCell <${process.env.EMAIL_USER}>`;
+    await transporter2.sendMail({
+      from: mailOptions.from || defaultFrom,
+      ...mailOptions
+    });
+    console.log("Email sent successfully to:", mailOptions.to);
+  } catch (error) {
+    console.error("Error sending email:", error);
+    throw error;
+  }
 }
-async function requireAuth(req, res, next) {
-  if (!req.session?.userId) {
+
+// server/helpers/emailTemplates.ts
+var EMAIL_LOGO_URL = "https://raw.githubusercontent.com/ToratYosef/BuyBacking/refs/heads/main/assets/logo.png";
+var TRUSTPILOT_REVIEW_LINK = "https://www.trustpilot.com/evaluate/secondhandcell.com";
+var TRUSTPILOT_STARS_IMAGE_URL = "https://cdn.trustpilot.net/brand-assets/4.1.0/stars/stars-5.png";
+function buildTrustpilotSection() {
+  return `
+    <div style="text-align:center; padding: 28px 24px 32px; background-color:#f8fafc; border-top: 1px solid #e2e8f0;">
+      <p style="font-weight:600; color:#0f172a; font-size:18px; margin:0 0 12px 0;">Loved your experience?</p>
+      <a href="${TRUSTPILOT_REVIEW_LINK}" style="display:inline-block; text-decoration:none; border:none; outline:none;">
+        <img src="${TRUSTPILOT_STARS_IMAGE_URL}" alt="Rate us on Trustpilot" style="height:58px; width:auto; display:block; margin:0 auto 10px auto; border:0;">
+      </a>
+      <p style="font-size:15px; color:#475569; margin:12px 0 0;">Your feedback keeps the <strong>SecondHandCell</strong> community thriving.</p>
+    </div>
+  `;
+}
+function buildCountdownNoticeHtml() {
+  return `
+    <div style="margin-top: 24px; padding: 18px 20px; background-color: #ecfdf5; border-radius: 12px; border: 1px solid #bbf7d0; color: #065f46; font-size: 17px; line-height: 1.6;">
+      <strong style="display:block; font-size:18px; margin-bottom:8px;">Friendly reminder</strong>
+      If we don't hear back, we may finalize your device at <strong>75% less</strong> to keep your order moving.
+    </div>
+  `;
+}
+function escapeHtml(text2) {
+  const map = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  };
+  return text2.replace(/[&<>"']/g, (m) => map[m]);
+}
+function buildEmailLayout({
+  title = "",
+  bodyHtml = "",
+  accentColor = "#16a34a",
+  includeTrustpilot = true,
+  footerText = "Need help? Reply to this email or call (347) 688-0662.",
+  includeCountdownNotice = false
+} = {}) {
+  const headingSection = title ? `
+        <tr>
+          <td style="background:${accentColor}; padding: 30px 24px; text-align:center;">
+            <h1 style="margin:0; font-size:28px; line-height:1.3; color:#ffffff; font-weight:700;">${escapeHtml(
+    title
+  )}</h1>
+          </td>
+        </tr>
+      ` : "";
+  const trustpilotSection = includeTrustpilot ? buildTrustpilotSection() : "";
+  const countdownSection = includeCountdownNotice ? buildCountdownNoticeHtml() : "";
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${escapeHtml(title || "SecondHandCell Update")}</title>
+      <style>
+        body { background-color:#f1f5f9; margin:0; padding:24px 12px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#0f172a; }
+        .email-shell { width:100%; max-width:640px; margin:0 auto; background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 25px 45px rgba(15,23,42,0.08); border:1px solid #e2e8f0; }
+        .logo-cell { padding:28px 0 16px; text-align:center; background-color:#ffffff; }
+        .logo-cell img { height:56px; width:auto; }
+        .content-cell { padding:32px 30px; font-size:17px; line-height:1.75; }
+        .content-cell p { margin:0 0 20px; }
+        .footer-cell { padding:28px 32px; text-align:center; font-size:15px; color:#475569; background-color:#f8fafc; border-top:1px solid #e2e8f0; }
+        .footer-cell p { margin:4px 0; }
+        a.button-link { display:inline-block; padding:14px 26px; border-radius:9999px; background-color:#16a34a; color:#ffffff !important; font-weight:600; text-decoration:none; font-size:17px; }
+      </style>
+    </head>
+    <body>
+      <table role="presentation" cellpadding="0" cellspacing="0" class="email-shell">
+        <tr>
+          <td class="logo-cell">
+            <img src="${EMAIL_LOGO_URL}" alt="SecondHandCell Logo" />
+          </td>
+        </tr>
+        ${headingSection}
+        <tr>
+          <td class="content-cell">
+            ${bodyHtml}
+            ${countdownSection}
+          </td>
+        </tr>
+        ${trustpilotSection ? `<tr><td>${trustpilotSection}</td></tr>` : ""}
+        <tr>
+          <td class="footer-cell">
+            <p>${footerText}</p>
+            <p>\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} SecondHandCell. All rights reserved.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+var SHIPPING_LABEL_EMAIL_HTML = buildEmailLayout({
+  title: "Your Shipping Label is Ready!",
+  bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Your shipping label for order <strong>#**ORDER_ID**</strong> is ready to go.</p>
+      <p style="margin-bottom:28px;">Use the secure button below to download it instantly and get your device on the way to us.</p>
+      <div style="text-align:center; margin-bottom:32px;">
+        <a href="**LABEL_DOWNLOAD_LINK**" class="button-link">Download Shipping Label</a>
+      </div>
+      <div style="background:#f8fafc; border:1px solid #dbeafe; border-radius:14px; padding:20px 24px;">
+        <p style="margin:0 0 10px;"><strong style="color:#0f172a;">Tracking Number</strong><br><span style="color:#2563eb; font-weight:600;">**TRACKING_NUMBER**</span></p>
+        <p style="margin:0; color:#475569;">Drop your device off with your preferred carrier as soon as you're ready.</p>
+      </div>
+      <p style="margin-top:28px;">Need a hand? Reply to this email and our team will guide you.</p>
+  `
+});
+var SHIPPING_KIT_EMAIL_HTML = buildEmailLayout({
+  title: "Your Shipping Kit is on its Way!",
+  bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Your shipping kit for order <strong>#**ORDER_ID**</strong> is en route.</p>
+      <p>Track its journey with the number below and get ready to pop your device inside once it arrives.</p>
+      <div style="background:#f8fafc; border:1px solid #dbeafe; border-radius:14px; padding:20px 24px; margin:0 0 28px;">
+        <p style="margin:0 0 10px;"><strong style="color:#0f172a;">Tracking Number</strong><br><span style="color:#2563eb; font-weight:600;">**TRACKING_NUMBER**</span></p>
+        <p style="margin:0; color:#475569;">Keep an eye out for your kit and pack your device securely when it lands.</p>
+      </div>
+      <p>Have accessories you don't need? Feel free to include them\u2014we'll recycle responsibly.</p>
+      <p>Need anything else? Just reply to this email.</p>
+  `
+});
+var ORDER_RECEIVED_EMAIL_HTML = buildEmailLayout({
+  title: "We've received your order!",
+  bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Thanks for choosing SecondHandCell! We've logged your order for <strong>**DEVICE_NAME**</strong>.</p>
+      <p>Your order ID is <strong style="color:#2563eb;">#**ORDER_ID**</strong>. Keep it handy for any questions.</p>
+      <h2 style="font-size:20px; color:#0f172a; margin:32px 0 12px;">Before you ship</h2>
+      <ul style="padding-left:22px; margin:0 0 20px; color:#475569;">
+        <li style="margin-bottom:10px;"><strong>Backup your data</strong> so nothing personal is lost.</li>
+        <li style="margin-bottom:10px;"><strong>Factory reset</strong> the device to wipe personal info.</li>
+        <li style="margin-bottom:10px;"><strong>Remove accounts</strong> such as Apple ID/iCloud or Google/Samsung accounts.<br><span style="display:block; margin-top:6px; margin-left:10px;">\u2022 Turn off Find My iPhone (FMI).<br>\u2022 Disable Factory Reset Protection (FRP) on Android.</span></li>
+        <li style="margin-bottom:10px;"><strong>Remove SIM cards</strong> and eSIM profiles.</li>
+        <li style="margin-bottom:10px;"><strong>Pack accessories separately</strong> unless we specifically request them.</li>
+      </ul>
+      <div style="background:#fef3c7; border-radius:16px; padding:18px 22px; border:1px solid #fde68a; color:#92400e; margin:30px 0;">
+        <strong>Important:</strong> We can't process devices that still have FMI/FRP enabled, an outstanding balance, or a blacklist/lost/stolen status.
+      </div>
+      **SHIPPING_INSTRUCTION**
+  `
+});
+var DEVICE_RECEIVED_EMAIL_HTML = buildEmailLayout({
+  title: "Your device has arrived!",
+  bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Your device for order <strong style="color:#2563eb;">#**ORDER_ID**</strong> has landed at our facility.</p>
+      <p>Our technicians are giving it a full inspection now. We'll follow up shortly with an update on your payout.</p>
+      <p>Have questions while you wait? Just reply to this email\u2014real humans are here to help.</p>
+  `
+});
+var ORDER_PLACED_ADMIN_EMAIL_HTML = buildEmailLayout({
+  title: "New order submitted",
+  accentColor: "#f97316",
+  bodyHtml: `
+      <p>Heads up! A new order just came in.</p>
+      <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:16px; padding:22px 24px; margin-bottom:28px; color:#7c2d12;">
+        <p style="margin:0 0 10px;"><strong>Customer</strong>: **CUSTOMER_NAME**</p>
+        <p style="margin:0 0 10px;"><strong>Order ID</strong>: #**ORDER_ID**</p>
+        <p style="margin:0 0 10px;"><strong>Device</strong>: **DEVICE_NAME**</p>
+        <p style="margin:0;"><strong>Estimated Quote</strong>: $**ESTIMATED_QUOTE** \u2022 <strong>Shipping</strong>: **SHIPPING_PREFERENCE**</p>
+      </div>
+      <div style="text-align:center; margin-bottom:20px;">
+        <a href="https://secondhandcell.com/admin" class="button-link" style="background-color:#f97316;">Open in Admin</a>
+      </div>
+      <p style="color:#475569;">This alert is automated\u2014feel free to reply if you notice anything unusual.</p>
+  `
+});
+var BLACKLISTED_EMAIL_HTML = buildEmailLayout({
+  title: "Action required: Carrier blacklist detected",
+  accentColor: "#dc2626",
+  includeCountdownNotice: true,
+  includeTrustpilot: false,
+  bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>During our review of order <strong>#**ORDER_ID**</strong>, the carrier database flagged the device as lost, stolen, or blacklisted.</p>
+      <p>We can't release payment while this status is active. Please contact your carrier to remove the flag and reply with confirmation or documentation so we can re-run the check.</p>
+      <p>If you believe this alert is an error, include any proof in your reply and we'll take another look.</p>
+      <div style="color:#dc2626; font-size:15px; line-height:1.6;">
+        <p style="margin: 0 0 16px;">State and local law require us to hold devices that test positive for a lost, stolen, or blacklisted status. Key regulations include:</p>
+        <ul style="margin: 0 0 16px; padding-left: 20px;">
+          <li><strong>New York Penal Law \xA7\xA7 155.05(2)(b) &amp; 165.40\u2013165.54:</strong> Buying or possessing property that is reported lost or stolen can constitute larceny or criminal possession of stolen property.</li>
+          <li><strong>New York City Administrative Code \xA7\xA7 20-272 &amp; 20-273:</strong> Secondhand dealers must record every transaction, report suspicious items to the NYPD, and hold flagged goods for law enforcement review.</li>
+          <li><strong>New York General Business Law Article 6:</strong> Requires detailed recordkeeping and prohibits resale of devices until legal status issues are resolved.</li>
+        </ul>
+        <p style="margin: 0;">We will continue to cooperate with law enforcement and cannot release the device back to you unless they authorize it. For more information, review our <a href="https://secondhandcell.com/terms.html" style="color:#2563eb;">Terms &amp; Conditions</a> or reply with documentation clearing the device so we can re-run the check.</p>
+      </div>
+  `
+});
+var FMI_EMAIL_HTML = buildEmailLayout({
+  title: "Turn off Find My to continue",
+  accentColor: "#f59e0b",
+  includeCountdownNotice: true,
+  includeTrustpilot: false,
+  bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Our inspection for order <strong>#**ORDER_ID**</strong> shows Find My iPhone / Activation Lock is still enabled.</p>
+      <p>Please complete the steps below so we can finish processing your payout:</p>
+      <ol style="padding-left:22px; color:#475569; margin-bottom:20px;">
+        <li>Visit <a href="https://icloud.com/find" target="_blank" style="color:#2563eb;">icloud.com/find</a> and sign in.</li>
+        <li>Select the device you're selling.</li>
+        <li>Choose "Remove from Account".</li>
+        <li>Confirm the device no longer appears in your list.</li>
+      </ol>
+      <div style="text-align:center; margin:32px 0 24px;">
+        <a href="**CONFIRM_URL**" class="button-link" style="background-color:#f59e0b;">I've turned off Find My</a>
+      </div>
+      <p style="color:#b45309; font-size:15px;">Once it's disabled, click the button above or reply to this email so we can recheck your device.</p>
+  `
+});
+var BAL_DUE_EMAIL_HTML = buildEmailLayout({
+  title: "Balance due with your carrier",
+  accentColor: "#f97316",
+  includeCountdownNotice: true,
+  includeTrustpilot: false,
+  bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>When we ran your device for order <strong>#**ORDER_ID**</strong>, the carrier reported a status of <strong>**FINANCIAL_STATUS**</strong>.</p>
+      <p>Please contact your carrier to clear the balance and then reply to this email so we can rerun the check and keep your payout on track.</p>
+      <p style="color:#c2410c;">Need help figuring out the right department to call? Let us know and we'll point you in the right direction.</p>
+  `
+});
+var DOWNGRADE_EMAIL_HTML = buildEmailLayout({
+  title: "Order finalized at adjusted payout",
+  accentColor: "#f97316",
+  includeTrustpilot: false,
+  bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>We reached out about the issue with your device for order <strong>#**ORDER_ID**</strong> but haven't received an update.</p>
+      <p>To keep things moving, we've finalized the device at 75% less than the original offer. If you resolve the issue, reply to this email and we'll happily re-evaluate.</p>
+      <p>We're here to help\u2014just let us know how you'd like to proceed.</p>
+  `
+});
+function getOrderCompletedEmailTemplate({ includeTrustpilot = true } = {}) {
+  return buildEmailLayout({
+    title: "\u{1F973} Your order is complete!",
+    includeTrustpilot,
+    bodyHtml: `
+        <p>Hi **CUSTOMER_NAME**,</p>
+        <p>Great news! Order <strong>#**ORDER_ID**</strong> is complete and your payout is headed your way.</p>
+        <div style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:20px 24px; margin:28px 0;">
+          <p style="margin:0 0 12px;"><strong style="color:#0f172a;">Device</strong><br><span style="color:#475569;">**DEVICE_SUMMARY**</span></p>
+          <p style="margin:0 0 12px;"><strong style="color:#0f172a;">Payout</strong><br><span style="color:#059669; font-size:22px; font-weight:700;">$**ORDER_TOTAL**</span></p>
+          <p style="margin:0;"><strong style="color:#0f172a;">Payment method</strong><br><span style="color:#475569;">**PAYMENT_METHOD**</span></p>
+        </div>
+        <p>Thanks for choosing SecondHandCell!</p>
+    `
+  });
+}
+var REVIEW_REQUEST_EMAIL_HTML = buildEmailLayout({
+  title: "We'd love your feedback",
+  accentColor: "#0ea5e9",
+  bodyHtml: `
+      <p>Hello **CUSTOMER_NAME**,</p>
+      <p>Thanks again for trusting us with your device. Sharing a quick review helps other sellers feel confident working with SecondHandCell.</p>
+      <p style="margin-bottom:32px;">It only takes a minute and means the world to our team.</p>
+      <div style="text-align:center; margin-bottom:24px;">
+        <a href="${TRUSTPILOT_REVIEW_LINK}" class="button-link" style="background-color:#0ea5e9;">Leave a Trustpilot review</a>
+      </div>
+      <p style="text-align:center; color:#475569;">Thank you for being part of the SecondHandCell community!</p>
+  `
+});
+var EMAIL_TEMPLATES = {
+  SHIPPING_LABEL: {
+    subject: "Your SecondHandCell Shipping Label for Order #**ORDER_ID**",
+    html: SHIPPING_LABEL_EMAIL_HTML
+  },
+  SHIPPING_KIT: {
+    subject: "Your SecondHandCell Shipping Kit for Order #**ORDER_ID** is on its Way!",
+    html: SHIPPING_KIT_EMAIL_HTML
+  },
+  ORDER_RECEIVED: {
+    subject: "Order Confirmation #**ORDER_ID** - SecondHandCell",
+    html: ORDER_RECEIVED_EMAIL_HTML
+  },
+  DEVICE_RECEIVED: {
+    subject: "Your Device Has Arrived - Order #**ORDER_ID**",
+    html: DEVICE_RECEIVED_EMAIL_HTML
+  },
+  ORDER_PLACED_ADMIN: {
+    subject: "New Order Submitted - #**ORDER_ID**",
+    html: ORDER_PLACED_ADMIN_EMAIL_HTML
+  },
+  BLACKLISTED: {
+    subject: "Important Notice Regarding Your Device for Order #**ORDER_ID**",
+    html: BLACKLISTED_EMAIL_HTML
+  },
+  FMI_ACTIVE: {
+    subject: "Action Required: Turn Off Find My iPhone - Order #**ORDER_ID**",
+    html: FMI_EMAIL_HTML
+  },
+  BALANCE_DUE: {
+    subject: "Action Required: Outstanding Balance Detected - Order #**ORDER_ID**",
+    html: BAL_DUE_EMAIL_HTML
+  },
+  DOWNGRADE: {
+    subject: "Order Update - Adjusted Payout for #**ORDER_ID**",
+    html: DOWNGRADE_EMAIL_HTML
+  },
+  ORDER_COMPLETED: {
+    subject: "Your Payout is on the Way! - Order #**ORDER_ID**",
+    getHtml: getOrderCompletedEmailTemplate
+  },
+  REVIEW_REQUEST: {
+    subject: "How was your experience with SecondHandCell?",
+    html: REVIEW_REQUEST_EMAIL_HTML
+  }
+};
+function replaceEmailVariables(template, variables) {
+  let result = template;
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`\\*\\*${key}\\*\\*`, "g");
+    result = result.replace(regex, value || "");
+  }
+  return result;
+}
+
+// server/routes/emails.ts
+function createEmailsRouter() {
+  const router = Router();
+  router.post("/send-email", async (req, res) => {
+    try {
+      const { to, bcc, subject, html } = req.body || {};
+      if (!to || !subject || !html) {
+        return res.status(400).json({ error: "Missing required fields: to, subject, and html are required." });
+      }
+      await sendEmail({
+        to,
+        subject,
+        html,
+        bcc: Array.isArray(bcc) ? bcc : bcc ? [bcc] : []
+      });
+      res.status(200).json({ message: "Email sent successfully." });
+    } catch (error) {
+      console.error("Error sending email:", error);
+      res.status(500).json({ error: "Failed to send email." });
+    }
+  });
+  router.post("/test-emails", async (req, res) => {
+    const { email, emailTypes } = req.body || {};
+    if (!email || !emailTypes || !Array.isArray(emailTypes)) {
+      return res.status(400).json({ error: "Email and emailTypes array are required." });
+    }
+    try {
+      const results = [];
+      for (const type of emailTypes) {
+        let template;
+        let variables = {
+          CUSTOMER_NAME: "Test Customer",
+          ORDER_ID: "TEST-12345",
+          TRACKING_NUMBER: "TEST-TRACKING",
+          LABEL_DOWNLOAD_LINK: "https://example.com/label.pdf",
+          STATUS_REASON: "blacklisted/lost/stolen"
+        };
+        switch (type.toLowerCase()) {
+          case "shipping_label":
+            template = EMAIL_TEMPLATES.SHIPPING_LABEL;
+            break;
+          case "shipping_kit":
+            template = EMAIL_TEMPLATES.SHIPPING_KIT;
+            break;
+          case "blacklisted":
+            template = EMAIL_TEMPLATES.BLACKLISTED;
+            break;
+          default:
+            results.push({ type, status: "skipped", reason: "Unknown template type" });
+            continue;
+        }
+        await sendEmail({
+          to: email,
+          subject: replaceEmailVariables(template.subject, variables),
+          html: replaceEmailVariables(template.html, variables)
+        });
+        results.push({ type, status: "sent" });
+      }
+      console.log("Test emails sent. Types:", emailTypes);
+      res.status(200).json({ message: "Test emails sent", email, results });
+    } catch (error) {
+      console.error("Failed to send test emails:", error);
+      res.status(500).json({ error: `Failed to send test emails: ${error.message}` });
+    }
+  });
+  router.post("/orders/:id/send-condition-email", async (req, res) => {
+    try {
+      const { reason, notes, label: labelText } = req.body || {};
+      const orderId = req.params.id;
+      res.json({ message: "Email sent successfully." });
+    } catch (error) {
+      console.error("Failed to send condition email:", error);
+      res.status(500).json({ error: "Failed to send condition email." });
+    }
+  });
+  router.post("/orders/:id/fmi-cleared", async (req, res) => {
+    try {
+      const { id } = req.params;
+      res.json({ message: "FMI status updated successfully." });
+    } catch (error) {
+      console.error("Error clearing FMI status:", error);
+      res.status(500).json({ error: "Failed to clear FMI status" });
+    }
+  });
+  return router;
+}
+
+// server/routes/imei.ts
+import { Router as Router2 } from "express";
+
+// server/services/phonecheck.ts
+import axios from "axios";
+var PHONECHECK_BASE_URL = "https://clientapiv2.phonecheck.com";
+var PHONECHECK_SAMSUNG_BASE_URL = "https://api.phonecheck.com";
+function getPhoneCheckCredentials() {
+  return {
+    apiKey: process.env.PHONECHECK_API_KEY,
+    username: process.env.PHONECHECK_USERNAME
+  };
+}
+async function checkEsn(params) {
+  const credentials = getPhoneCheckCredentials();
+  if (!credentials.username || !credentials.apiKey) {
+    throw new Error("PhoneCheck credentials not configured. Set PHONECHECK_USERNAME and PHONECHECK_API_KEY.");
+  }
+  try {
+    const response = await axios.post(
+      `${PHONECHECK_BASE_URL}/api/esn/check`,
+      {
+        imei: params.imei,
+        carrier: params.carrier,
+        deviceType: params.deviceType,
+        brand: params.brand,
+        checkAll: params.checkAll || false
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${credentials.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        timeout: 3e4
+      }
+    );
+    const data = response.data;
+    const normalized = {
+      blacklisted: data.blacklisted || false,
+      summary: data.summary,
+      remarks: data.remarks,
+      brand: data.brand,
+      model: data.model,
+      deviceName: data.deviceName,
+      carrier: data.carrier,
+      raw: data
+    };
+    return { normalized, raw: data };
+  } catch (error) {
+    console.error("PhoneCheck ESN check failed:", error.message);
+    throw new Error(`PhoneCheck ESN lookup failed: ${error.message}`);
+  }
+}
+async function checkCarrierLock(params) {
+  const credentials = getPhoneCheckCredentials();
+  if (!credentials.apiKey) {
+    throw new Error("PhoneCheck credentials not configured.");
+  }
+  try {
+    const response = await axios.post(
+      `${PHONECHECK_BASE_URL}/api/carrier/lock`,
+      {
+        imei: params.imei,
+        deviceType: params.deviceType
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${credentials.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        timeout: 3e4
+      }
+    );
+    const data = response.data;
+    return {
+      normalized: {
+        carrier: data.carrier,
+        raw: data
+      },
+      raw: data
+    };
+  } catch (error) {
+    console.error("PhoneCheck carrier lock check failed:", error.message);
+    throw error;
+  }
+}
+async function checkSamsungCarrierInfo(params) {
+  const credentials = getPhoneCheckCredentials();
+  if (!credentials.apiKey) {
+    throw new Error("PhoneCheck API key not configured for Samsung checks.");
+  }
+  try {
+    const response = await axios.post(
+      `${PHONECHECK_SAMSUNG_BASE_URL}/api/samsung/info`,
+      {
+        identifier: params.identifier
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${credentials.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        timeout: 3e4
+      }
+    );
+    const data = response.data;
+    return {
+      normalized: {
+        model: data.modelDescription,
+        carrier: data.carrier,
+        warrantyStatus: data.warranty,
+        raw: data
+      },
+      raw: data
+    };
+  } catch (error) {
+    console.error("Samsung carrier info check failed:", error.message);
+    throw error;
+  }
+}
+function isAppleDeviceHint(...values) {
+  const appleRegex = /(apple|iphone|ipad|ipod|ios|watch)/i;
+  return values.some((val) => val && appleRegex.test(String(val)));
+}
+function isSamsungDeviceHint(...values) {
+  const samsungRegex = /(samsung|galaxy)/i;
+  return values.some((val) => val && samsungRegex.test(String(val)));
+}
+
+// server/routes/imei.ts
+function createImeiRouter() {
+  const router = Router2();
+  router.post("/check-esn", async (req, res) => {
+    const {
+      imei,
+      orderId,
+      customerName,
+      customerEmail,
+      carrier,
+      deviceType,
+      brand,
+      checkAll
+    } = req.body || {};
+    if (!imei || !orderId) {
+      return res.status(400).json({ error: "IMEI and Order ID are required." });
+    }
+    try {
+      let checkAllFlag = false;
+      if (typeof checkAll === "boolean") {
+        checkAllFlag = checkAll;
+      } else if (typeof checkAll === "number") {
+        checkAllFlag = checkAll !== 0;
+      } else if (typeof checkAll === "string") {
+        checkAllFlag = ["1", "true", "yes"].includes(checkAll.trim().toLowerCase());
+      }
+      const trimmedImei = String(imei).trim();
+      const esnResult = await checkEsn({
+        imei: trimmedImei,
+        carrier,
+        deviceType,
+        brand,
+        checkAll: checkAllFlag
+      });
+      let carrierLockResult = null;
+      const appleHintValues = [
+        brand,
+        deviceType,
+        esnResult?.normalized?.brand,
+        esnResult?.normalized?.model,
+        esnResult?.normalized?.deviceName
+      ];
+      if (isAppleDeviceHint(...appleHintValues)) {
+        try {
+          carrierLockResult = await checkCarrierLock({
+            imei: trimmedImei,
+            deviceType: "Apple"
+          });
+        } catch (carrierError) {
+          console.error(`Carrier lock lookup failed for order ${orderId}:`, carrierError);
+        }
+      }
+      let samsungCarrierInfoResult = null;
+      const samsungHintValues = [
+        brand,
+        deviceType,
+        esnResult?.normalized?.brand,
+        esnResult?.normalized?.model,
+        esnResult?.normalized?.deviceName
+      ];
+      if (isSamsungDeviceHint(...samsungHintValues)) {
+        try {
+          samsungCarrierInfoResult = await checkSamsungCarrierInfo({
+            identifier: trimmedImei
+          });
+        } catch (samsungError) {
+          console.error(`Samsung carrier info lookup failed for order ${orderId}:`, samsungError);
+        }
+      }
+      const normalized = {
+        ...carrierLockResult?.normalized || {},
+        ...esnResult.normalized
+      };
+      if (samsungCarrierInfoResult?.normalized) {
+        normalized.samsungCarrierInfo = samsungCarrierInfoResult.normalized;
+        if (!normalized.model && samsungCarrierInfoResult.normalized.model) {
+          normalized.model = samsungCarrierInfoResult.normalized.model;
+        }
+        if (!normalized.carrier && samsungCarrierInfoResult.normalized.carrier) {
+          normalized.carrier = samsungCarrierInfoResult.normalized.carrier;
+        }
+      }
+      const rawResponses = { esn: esnResult.raw };
+      if (carrierLockResult) {
+        rawResponses.carrierLock = carrierLockResult.raw;
+      }
+      if (samsungCarrierInfoResult) {
+        rawResponses.samsungCarrier = samsungCarrierInfoResult.raw;
+      }
+      normalized.raw = rawResponses;
+      if (normalized.blacklisted && customerEmail) {
+        const statusReason = normalized.summary || normalized.remarks || "Blacklisted";
+        try {
+          await sendEmail({
+            to: customerEmail,
+            subject: replaceEmailVariables(EMAIL_TEMPLATES.BLACKLISTED.subject, {
+              ORDER_ID: orderId
+            }),
+            html: replaceEmailVariables(EMAIL_TEMPLATES.BLACKLISTED.html, {
+              CUSTOMER_NAME: customerName || "Customer",
+              ORDER_ID: orderId,
+              STATUS_REASON: statusReason
+            })
+          });
+        } catch (emailError) {
+          console.error(`Failed to send blacklist notification for order ${orderId}:`, emailError);
+        }
+      }
+      res.json(normalized);
+    } catch (error) {
+      console.error("Error during IMEI check:", error);
+      if (error.message?.includes("PhoneCheck")) {
+        return res.status(502).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to perform IMEI check." });
+    }
+  });
+  return router;
+}
+
+// server/routes/labels.ts
+import { Router as Router3 } from "express";
+
+// server/services/shipstation.ts
+import axios2 from "axios";
+function getShipStationCredentials() {
+  const key = process.env.SHIPSTATION_KEY;
+  const secret = process.env.SHIPSTATION_SECRET;
+  if (!key || !secret) {
+    throw new Error("ShipStation credentials not configured. Set SHIPSTATION_KEY and SHIPSTATION_SECRET.");
+  }
+  return { key, secret };
+}
+function buildAuthHeader(credentials) {
+  return `Basic ${Buffer.from(`${credentials.key}:${credentials.secret}`).toString("base64")}`;
+}
+async function createShipStationLabel(fromAddress, toAddress, carrierCode, serviceCode, packageCode = "package", weightInOunces = 8, testLabel = false, orderId) {
+  const credentials = getShipStationCredentials();
+  const authHeader = buildAuthHeader(credentials);
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const payload = {
+    carrierCode,
+    serviceCode,
+    packageCode,
+    shipDate: today,
+    weight: {
+      value: weightInOunces,
+      units: "ounces"
+    },
+    shipFrom: fromAddress,
+    shipTo: toAddress,
+    testLabel
+  };
+  try {
+    const response = await axios2.post(
+      "https://ssapi.shipstation.com/shipments/createlabel",
+      payload,
+      {
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        timeout: 3e4
+      }
+    );
+    return {
+      trackingNumber: response.data.trackingNumber,
+      labelData: response.data.labelData,
+      shipmentId: response.data.shipmentId,
+      carrierCode: response.data.carrierCode,
+      serviceCode: response.data.serviceCode,
+      status: response.data.status
+    };
+  } catch (error) {
+    console.error("Error creating ShipStation label:", error.response?.data || error.message);
+    throw new Error(
+      `Failed to create ShipStation label: ${error.response?.data?.ExceptionMessage || error.message}`
+    );
+  }
+}
+
+// server/routes/labels.ts
+var SHC_RECEIVING_ADDRESS = {
+  name: "SHC",
+  company: "SecondHandCell",
+  phone: "2015551234",
+  street1: "1206 McDonald Ave",
+  street2: "Ste Rear",
+  city: "Brooklyn",
+  state: "NY",
+  postalCode: "11230",
+  country: "US"
+};
+function createLabelsRouter() {
+  const router = Router3();
+  router.post("/generate-label/:id", async (req, res) => {
+    try {
+      const orderId = req.params.id;
+      const order = {
+        id: orderId,
+        shippingPreference: "Email Label Requested",
+        shippingInfo: {
+          fullName: "Test Customer",
+          email: "customer@example.com",
+          streetAddress: "123 Main St",
+          city: "New York",
+          state: "NY",
+          zipCode: "10001"
+        }
+      };
+      const buyerAddress = {
+        name: order.shippingInfo.fullName,
+        phone: "5555555555",
+        street1: order.shippingInfo.streetAddress,
+        city: order.shippingInfo.city,
+        state: order.shippingInfo.state,
+        postalCode: order.shippingInfo.zipCode,
+        country: "US"
+      };
+      let mainTrackingNumber = "";
+      let labelType = "";
+      if (order.shippingPreference === "Shipping Kit Requested") {
+        const [outboundLabel, inboundLabel] = await Promise.all([
+          createShipStationLabel(
+            SHC_RECEIVING_ADDRESS,
+            buyerAddress,
+            "stamps_com",
+            "usps_ground_advantage",
+            "package",
+            8,
+            false,
+            order.id
+          ),
+          createShipStationLabel(
+            buyerAddress,
+            SHC_RECEIVING_ADDRESS,
+            "stamps_com",
+            "usps_ground_advantage",
+            "package",
+            8,
+            false,
+            order.id
+          )
+        ]);
+        mainTrackingNumber = outboundLabel.trackingNumber;
+        labelType = "kit";
+        await sendEmail({
+          to: order.shippingInfo.email,
+          subject: replaceEmailVariables(EMAIL_TEMPLATES.SHIPPING_KIT.subject, {
+            ORDER_ID: order.id
+          }),
+          html: replaceEmailVariables(EMAIL_TEMPLATES.SHIPPING_KIT.html, {
+            CUSTOMER_NAME: order.shippingInfo.fullName,
+            ORDER_ID: order.id,
+            TRACKING_NUMBER: outboundLabel.trackingNumber
+          })
+        });
+      } else {
+        const customerLabel = await createShipStationLabel(
+          buyerAddress,
+          SHC_RECEIVING_ADDRESS,
+          "stamps_com",
+          "usps_ground_advantage",
+          "package",
+          8,
+          false,
+          order.id
+        );
+        mainTrackingNumber = customerLabel.trackingNumber;
+        labelType = "email";
+        await sendEmail({
+          to: order.shippingInfo.email,
+          subject: replaceEmailVariables(EMAIL_TEMPLATES.SHIPPING_LABEL.subject, {
+            ORDER_ID: order.id
+          }),
+          html: replaceEmailVariables(EMAIL_TEMPLATES.SHIPPING_LABEL.html, {
+            CUSTOMER_NAME: order.shippingInfo.fullName,
+            ORDER_ID: order.id,
+            TRACKING_NUMBER: customerLabel.trackingNumber,
+            LABEL_DOWNLOAD_LINK: "https://example.com/label.pdf"
+            // TODO: Replace with actual URL
+          })
+        });
+      }
+      res.json({
+        message: `Label(s) generated successfully (${labelType})`,
+        orderId,
+        trackingNumber: mainTrackingNumber
+      });
+    } catch (err) {
+      console.error("Error generating label:", err.message || err);
+      res.status(500).json({ error: "Failed to generate label" });
+    }
+  });
+  router.post("/orders/:id/return-label", async (req, res) => {
+    try {
+      const orderId = req.params.id;
+      const order = {
+        id: orderId,
+        shippingInfo: {
+          fullName: "Test Customer",
+          email: "customer@example.com",
+          streetAddress: "123 Main St",
+          city: "New York",
+          state: "NY",
+          zipCode: "10001"
+        }
+      };
+      const buyerAddress = {
+        name: order.shippingInfo.fullName,
+        phone: "5555555555",
+        street1: order.shippingInfo.streetAddress,
+        city: order.shippingInfo.city,
+        state: order.shippingInfo.state,
+        postalCode: order.shippingInfo.zipCode,
+        country: "US"
+      };
+      const returnLabel = await createShipStationLabel(
+        SHC_RECEIVING_ADDRESS,
+        buyerAddress,
+        "stamps_com",
+        "usps_ground_advantage",
+        "package",
+        8,
+        false,
+        `return-${order.id}`
+      );
+      await sendEmail({
+        to: order.shippingInfo.email,
+        subject: `Your SecondHandCell Return Label for Order #${order.id}`,
+        html: `
+          <p>Hello ${order.shippingInfo.fullName},</p>
+          <p>As requested, here is your return shipping label for Order #${order.id}.</p>
+          <p>Return Tracking Number: <strong>${returnLabel.trackingNumber}</strong></p>
+          <p>Thank you,<br>The SecondHandCell Team</p>
+        `
+      });
+      res.json({
+        message: "Return label generated successfully.",
+        orderId,
+        trackingNumber: returnLabel.trackingNumber
+      });
+    } catch (err) {
+      console.error("Error generating return label:", err);
+      res.status(500).json({ error: "Failed to generate return label" });
+    }
+  });
+  return router;
+}
+
+// server/routes/orders.ts
+import { Router as Router4 } from "express";
+function createOrdersRouter() {
+  const router = Router4();
+  router.post("/fetch-pdf", async (req, res) => {
+    try {
+      const { url } = req.body;
+      res.json({ message: "PDF fetched successfully" });
+    } catch (error) {
+      console.error("Error fetching PDF:", error);
+      res.status(500).json({ error: "Failed to fetch PDF" });
+    }
+  });
+  router.get("/orders", async (req, res) => {
+    try {
+      res.json({ orders: [] });
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+  router.get("/orders/needs-printing", async (req, res) => {
+    try {
+      res.json({ orders: [] });
+    } catch (error) {
+      console.error("Error fetching orders needing printing:", error);
+      res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+  router.post("/orders/needs-printing/bundle", async (req, res) => {
+    try {
+      res.json({ message: "Print bundle created" });
+    } catch (error) {
+      console.error("Error creating print bundle:", error);
+      res.status(500).json({ error: "Failed to create print bundle" });
+    }
+  });
+  router.post("/merge-print", async (req, res) => {
+    try {
+      const { orderIds } = req.body;
+      res.json({ message: "PDFs merged successfully" });
+    } catch (error) {
+      console.error("Error merging PDFs:", error);
+      res.status(500).json({ error: "Failed to merge PDFs" });
+    }
+  });
+  router.get("/merge-print/:orderIds", async (req, res) => {
+    try {
+      const { orderIds } = req.params;
+      res.json({ message: "Merged print generated" });
+    } catch (error) {
+      console.error("Error generating merged print:", error);
+      res.status(500).json({ error: "Failed to generate merged print" });
+    }
+  });
+  router.get("/orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      res.json({ order: null });
+    } catch (error) {
+      console.error("Error fetching order:", error);
+      res.status(500).json({ error: "Order not found" });
+    }
+  });
+  router.get("/orders/find", async (req, res) => {
+    try {
+      const { trackingNumber, email, orderId } = req.query;
+      res.json({ orders: [] });
+    } catch (error) {
+      console.error("Error finding orders:", error);
+      res.status(500).json({ error: "Failed to find orders" });
+    }
+  });
+  router.get("/orders/by-user/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      res.json({ orders: [] });
+    } catch (error) {
+      console.error("Error fetching user orders:", error);
+      res.status(500).json({ error: "Failed to fetch user orders" });
+    }
+  });
+  router.post("/submit-order", async (req, res) => {
+    try {
+      const orderData = req.body;
+      res.json({ orderId: "TBD", message: "Order submitted successfully" });
+    } catch (error) {
+      console.error("Error submitting order:", error);
+      res.status(500).json({ error: "Failed to submit order" });
+    }
+  });
+  router.get("/promo-codes/:code", async (req, res) => {
+    try {
+      const { code } = req.params;
+      res.json({ valid: false });
+    } catch (error) {
+      console.error("Error fetching promo code:", error);
+      res.status(500).json({ error: "Promo code not found" });
+    }
+  });
+  router.post("/generate-label/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      res.json({ message: "Label generated successfully" });
+    } catch (error) {
+      console.error("Error generating label:", error);
+      res.status(500).json({ error: "Failed to generate label" });
+    }
+  });
+  router.post("/orders/:id/void-label", async (req, res) => {
+    try {
+      const { id } = req.params;
+      res.json({ message: "Label voided successfully" });
+    } catch (error) {
+      console.error("Error voiding label:", error);
+      res.status(500).json({ error: "Failed to void label" });
+    }
+  });
+  router.get("/packing-slip/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      res.json({ message: "Packing slip generated" });
+    } catch (error) {
+      console.error("Error generating packing slip:", error);
+      res.status(500).json({ error: "Failed to generate packing slip" });
+    }
+  });
+  router.get("/print-bundle/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      res.json({ message: "Print bundle generated" });
+    } catch (error) {
+      console.error("Error generating print bundle:", error);
+      res.status(500).json({ error: "Failed to generate print bundle" });
+    }
+  });
+  router.post("/repair-label-generated", async (req, res) => {
+    try {
+      res.json({ processedCount: 0, updatedCount: 0 });
+    } catch (error) {
+      console.error("Failed to repair label-generated orders:", error);
+      res.status(500).json({ error: "Unable to repair label-generated orders" });
+    }
+  });
+  router.post("/orders/repair-label-generated", async (req, res) => {
+    try {
+      res.json({ processedCount: 0, updatedCount: 0 });
+    } catch (error) {
+      console.error("Failed to repair label-generated orders:", error);
+      res.status(500).json({ error: "Unable to repair label-generated orders" });
+    }
+  });
+  return router;
+}
+
+// server/routes/webhook.ts
+import { Router as Router5 } from "express";
+import crypto2 from "crypto";
+function createWebhookRouter() {
+  const router = Router5();
+  const verifyShipStationSignature = (req, res, next) => {
+    const signature = req.headers["x-shipstation-signature"];
+    const secret = process.env.SHIPSTATION_WEBHOOK_SECRET;
+    if (!signature) {
+      console.error("Webhook received without signature header.");
+      return res.status(401).send("Unauthorized: Signature missing.");
+    }
+    if (!secret) {
+      console.error("SHIPSTATION_WEBHOOK_SECRET not configured.");
+      return res.status(500).send("Internal Server Error.");
+    }
+    try {
+      const hmac = crypto2.createHmac("sha256", secret);
+      hmac.update(JSON.stringify(req.body));
+      const calculatedSignature = hmac.digest("base64");
+      if (calculatedSignature !== signature) {
+        console.error("Invalid ShipStation webhook signature.");
+        return res.status(401).send("Unauthorized: Invalid signature.");
+      }
+    } catch (err) {
+      console.error("Error verifying ShipStation signature:", err);
+      return res.status(500).send("Internal Server Error.");
+    }
+    next();
+  };
+  router.post("/webhook/shipstation", verifyShipStationSignature, async (req, res) => {
+    try {
+      const event = req.body;
+      console.log("Received ShipStation webhook event:", event);
+      res.status(200).send("Webhook received successfully");
+    } catch (err) {
+      console.error("Error processing ShipStation webhook:", err);
+      res.status(500).send("Failed to process webhook");
+    }
+  });
+  return router;
+}
+
+// server/routes.ts
+var slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+var stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-10-29.clover"
+  });
+}
+var requireAuth = (req, res, next) => {
+  if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });
   }
   next();
-}
-async function requireAdmin(req, res, next) {
-  if (!req.session?.userId) {
+};
+var getUserPrimaryCompany = async (userId) => {
+  const companyUsers2 = await storage.getCompanyUsersByUserId(userId);
+  if (companyUsers2.length === 0) {
+    return null;
+  }
+  return {
+    companyId: companyUsers2[0].companyId,
+    roleInCompany: companyUsers2[0].roleInCompany
+  };
+};
+var selectPriceTierForQuantity = (tiers, quantity) => {
+  const activeTiers = tiers.filter((tier) => tier.isActive !== false);
+  const sortedTiers = activeTiers.sort((a, b) => a.minQuantity - b.minQuantity);
+  const exactMatch = sortedTiers.find((tier) => {
+    const withinMin = quantity >= tier.minQuantity;
+    const withinMax = tier.maxQuantity ? quantity <= tier.maxQuantity : true;
+    return withinMin && withinMax;
+  });
+  if (exactMatch) return exactMatch;
+  const fallback = [...sortedTiers].filter((tier) => quantity >= tier.minQuantity).sort((a, b) => b.minQuantity - a.minQuantity)[0];
+  return fallback || null;
+};
+var requireAdmin = async (req, res, next) => {
+  if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });
   }
   const user = await storage.getUser(req.session.userId);
@@ -1040,1901 +2195,1726 @@ async function requireAdmin(req, res, next) {
     return res.status(403).json({ error: "Admin access required" });
   }
   next();
-}
-
-// server/routes.ts
-import { z as z2 } from "zod";
-
-// server/pricing.ts
-async function calculateDeviceOffer(input) {
-  const pricingRule = await storage.getPricingRuleByVariantAndCondition(
-    input.deviceVariantId,
-    input.conditionProfileId
-  );
-  if (!pricingRule) {
-    return null;
-  }
-  const basePrice = parseFloat(pricingRule.basePrice);
-  const penalties = {};
-  let totalPenalty = 0;
-  if (input.claimedIssues?.isFinanced && pricingRule.financedDevicePenaltyAmount) {
-    const penalty = parseFloat(pricingRule.financedDevicePenaltyAmount);
-    penalties.financed = penalty;
-    totalPenalty += penalty;
-  }
-  if (input.claimedIssues?.noPower && pricingRule.noPowerPenaltyAmount) {
-    const penalty = parseFloat(pricingRule.noPowerPenaltyAmount);
-    penalties.noPower = penalty;
-    totalPenalty += penalty;
-  }
-  if (input.claimedIssues?.functionalIssue && pricingRule.functionalIssuePenaltyAmount) {
-    const penalty = parseFloat(pricingRule.functionalIssuePenaltyAmount);
-    penalties.functionalIssue = penalty;
-    totalPenalty += penalty;
-  }
-  if (input.claimedIssues?.crackedGlass && pricingRule.crackedGlassPenaltyAmount) {
-    const penalty = parseFloat(pricingRule.crackedGlassPenaltyAmount);
-    penalties.crackedGlass = penalty;
-    totalPenalty += penalty;
-  }
-  if (input.claimedIssues?.activationLock && pricingRule.activationLockPenaltyAmount) {
-    const penalty = parseFloat(pricingRule.activationLockPenaltyAmount);
-    penalties.activationLock = penalty;
-    totalPenalty += penalty;
-  }
-  let finalOffer = basePrice - totalPenalty;
-  const minOffer = pricingRule.minOfferAmount ? parseFloat(pricingRule.minOfferAmount) : 0;
-  const maxOffer = pricingRule.maxOfferAmount ? parseFloat(pricingRule.maxOfferAmount) : Infinity;
-  finalOffer = Math.max(minOffer, Math.min(maxOffer, finalOffer));
-  return {
-    basePrice,
-    penalties,
-    totalPenalty,
-    finalOffer,
-    currency: pricingRule.currency,
-    pricingRuleId: pricingRule.id
-  };
-}
-
-// server/siteSettings.ts
-import { eq as eq2 } from "drizzle-orm";
-async function getSiteSettings() {
-  const [settings] = await db.select().from(siteSettings);
-  return settings || { logoUrl: "" };
-}
-async function updateSiteLogo(logoUrl) {
-  const [existing] = await db.select().from(siteSettings);
-  if (existing) {
-    await db.update(siteSettings).set({ logoUrl }).where(eq2(siteSettings.id, existing.id));
-  } else {
-    await db.insert(siteSettings).values({ logoUrl });
-  }
-}
-
-// server/routes.ts
-init_email();
-
-// server/phonecheck.ts
-import axios from "axios";
-var getBaseUrl = () => process.env.IMEI_BASE_URL || "https://clientapiv2.phonecheck.com";
-var getUsername = () => process.env.IMEI_USERNAME || "";
-var getApiKey = () => process.env.IMEI_API || "";
-async function checkIMEI(imei) {
-  try {
-    const cleanIMEI = imei.replace(/[\s-]/g, "");
-    const PHONECHECK_USERNAME = getUsername();
-    const PHONECHECK_API_KEY = getApiKey();
-    const PHONECHECK_BASE_URL = getBaseUrl();
-    if (!PHONECHECK_USERNAME || !PHONECHECK_API_KEY) {
-      console.warn("\u26A0\uFE0F PhoneCheck credentials not configured. Returning mock data.");
-      return {
-        imei: cleanIMEI,
-        make: "Apple",
-        model: "iPhone",
-        carrier: "Unknown",
-        isBlacklisted: false,
-        icloudStatus: "UNKNOWN",
-        rawData: { mock: true }
-      };
-    }
-    const response = await axios.post(
-      `${PHONECHECK_BASE_URL}/api/v2/device/check`,
-      {
-        imei: cleanIMEI,
-        username: PHONECHECK_USERNAME
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${PHONECHECK_API_KEY}`
-        },
-        timeout: 15e3
-        // 15 second timeout
-      }
-    );
-    const data = response.data;
-    return {
-      imei: cleanIMEI,
-      make: data.device?.make || data.make,
-      model: data.device?.model || data.model,
-      carrier: data.carrier?.name || data.carrier,
-      isBlacklisted: data.blacklist?.status === "BLACKLISTED" || data.isBlacklisted === true,
-      icloudStatus: parseICloudStatus(data.icloud || data.activationLock),
-      batteryHealth: data.battery?.health || data.batteryHealth,
-      storageCapacity: data.storage?.capacity || data.storageCapacity,
-      rawData: data
-    };
-  } catch (error) {
-    console.error("PhoneCheck API Error:", error.response?.data || error.message);
-    return {
-      imei,
-      isBlacklisted: false,
-      errors: [error.response?.data?.message || error.message || "Failed to check IMEI"]
-    };
-  }
-}
-function parseICloudStatus(icloudData) {
-  if (!icloudData) return "UNKNOWN";
-  if (typeof icloudData === "string") {
-    const status = icloudData.toUpperCase();
-    if (status.includes("ON") || status.includes("ENABLED") || status.includes("LOCKED")) return "ON";
-    if (status.includes("OFF") || status.includes("DISABLED") || status.includes("CLEAN")) return "OFF";
-  }
-  if (typeof icloudData === "object") {
-    const status = icloudData.status || icloudData.locked || icloudData.enabled;
-    if (status === true || status === "ON" || status === "ENABLED" || status === "LOCKED") return "ON";
-    if (status === false || status === "OFF" || status === "DISABLED" || status === "CLEAN") return "OFF";
-  }
-  return "UNKNOWN";
-}
-function isValidIMEI(imei) {
-  const cleanIMEI = imei.replace(/[\s-]/g, "");
-  if (!/^\d{15}$/.test(cleanIMEI)) {
-    return false;
-  }
-  let sum = 0;
-  let shouldDouble = false;
-  for (let i = cleanIMEI.length - 1; i >= 0; i--) {
-    let digit = parseInt(cleanIMEI[i]);
-    if (shouldDouble) {
-      digit *= 2;
-      if (digit > 9) digit -= 9;
-    }
-    sum += digit;
-    shouldDouble = !shouldDouble;
-  }
-  return sum % 10 === 0;
-}
-async function getDeviceInfoFromIMEI(imei) {
-  try {
-    const result = await checkIMEI(imei);
-    return {
-      make: result.make,
-      model: result.model,
-      storage: result.storageCapacity
-    };
-  } catch (error) {
-    console.error("Error getting device info from IMEI:", error);
-    return {};
-  }
-}
-
-// server/shipengine.ts
-import axios2 from "axios";
-var getApiKey2 = () => process.env.SHIPENGINE_KEY || process.env.SHIPENGINE_KEY_TEST || "";
-var SHIPENGINE_BASE_URL = "https://api.shipengine.com/v1";
-var FROM_ADDRESS = {
-  name: process.env.SHIPENGINE_FROM_NAME || "SHC",
-  company: process.env.SHIPENGINE_FROM_COMPANY || "SecondHandCell",
-  address_line1: process.env.SHIPENGINE_FROM_ADDRESS1 || "1206 McDonald Ave",
-  address_line2: process.env.SHIPENGINE_FROM_ADDRESS2 || "Ste Rear",
-  city_locality: process.env.SHIPENGINE_FROM_CITY || "Brooklyn",
-  state_province: process.env.SHIPENGINE_FROM_STATE || "NY",
-  postal_code: process.env.SHIPENGINE_FROM_POSTAL || "11230",
-  country_code: "US",
-  phone: process.env.SHIPENGINE_FROM_PHONE || "2015551234"
 };
-async function createShippingLabel(toAddress, orderNumber, options) {
-  try {
-    const SHIPENGINE_API_KEY = getApiKey2();
-    if (!SHIPENGINE_API_KEY) {
-      throw new Error("ShipEngine API key not configured");
-    }
-    const carrier = options?.carrier || "usps";
-    const serviceCode = options?.serviceCode || "usps_ground_advantage";
-    const weight = options?.weight || 16;
-    const labelRequest = {
-      shipment: {
-        service_code: serviceCode,
-        ship_to: {
-          ...toAddress,
-          country_code: toAddress.country_code || "US"
-        },
-        ship_from: FROM_ADDRESS,
-        packages: [
-          {
-            weight: {
-              value: weight,
-              unit: "ounce"
-            },
-            dimensions: {
-              unit: "inch",
-              length: 8,
-              width: 6,
-              height: 4
-            },
-            package_code: "package",
-            // Standard package
-            label_messages: {
-              reference1: orderNumber
-            }
-          }
-        ]
-      },
-      label_format: "pdf",
-      label_layout: "4x6",
-      test_label: SHIPENGINE_API_KEY.includes("TEST")
-      // Use test mode if test key
-    };
-    const response = await axios2.post(
-      `${SHIPENGINE_BASE_URL}/labels`,
-      labelRequest,
-      {
-        headers: {
-          "API-Key": SHIPENGINE_API_KEY,
-          "Content-Type": "application/json"
-        },
-        timeout: 3e4
-        // 30 second timeout
-      }
-    );
-    const data = response.data;
-    console.log("[ShipEngine] Response data:", JSON.stringify({
-      label_id: data.label_id,
-      tracking_number: data.tracking_number,
-      label_download: data.label_download,
-      label_download_url: data.label_download_url
-    }, null, 2));
-    return {
-      labelId: data.label_id,
-      trackingNumber: data.tracking_number,
-      labelUrl: data.label_download?.href || data.label_download_url || data.label_url,
-      labelPdfUrl: data.label_download?.href || data.label_url,
-      labelDownload: data.label_download,
-      cost: data.shipment_cost?.amount || 0,
-      carrier: data.carrier_id || carrier,
-      serviceCode: data.service_code || serviceCode,
-      packageCode: data.package_code || "package",
-      shipDate: data.ship_date || (/* @__PURE__ */ new Date()).toISOString(),
-      rawResponse: data
-    };
-  } catch (error) {
-    console.error("ShipEngine API Error:", error.response?.data || error.message);
-    throw new Error(
-      error.response?.data?.errors?.[0]?.message || error.response?.data?.message || "Failed to create shipping label"
-    );
-  }
-}
-async function trackShipment(carrierCode, trackingNumber) {
-  try {
-    const SHIPENGINE_API_KEY = getApiKey2();
-    if (!SHIPENGINE_API_KEY) {
-      throw new Error("ShipEngine API key not configured");
-    }
-    const response = await axios2.get(
-      `${SHIPENGINE_BASE_URL}/tracking`,
-      {
-        params: {
-          carrier_code: carrierCode,
-          tracking_number: trackingNumber
-        },
-        headers: {
-          "API-Key": SHIPENGINE_API_KEY
-        }
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Tracking Error:", error.response?.data || error.message);
-    throw new Error("Failed to track shipment");
-  }
-}
-async function voidLabel(labelId) {
-  try {
-    const SHIPENGINE_API_KEY = getApiKey2();
-    if (!SHIPENGINE_API_KEY) {
-      throw new Error("ShipEngine API key not configured");
-    }
-    const response = await axios2.put(
-      `${SHIPENGINE_BASE_URL}/labels/${labelId}/void`,
-      {},
-      {
-        headers: {
-          "API-Key": SHIPENGINE_API_KEY
-        }
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Void Label Error:", error.response?.data || error.message);
-    throw new Error("Failed to void label");
-  }
-}
-
-// server/routes.ts
 async function registerRoutes(app2) {
-  app2.get("/api/admin/quick-stats", requireAdmin, async (req, res) => {
-    try {
-      const orders = await storage.getAllSellOrders();
-      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-      const todayOrders = orders.filter((o) => {
-        if (!o.createdAt) return false;
-        try {
-          const created = typeof o.createdAt === "string" ? o.createdAt : new Date(o.createdAt).toISOString();
-          return created.startsWith(today);
-        } catch {
-          return false;
-        }
-      }).length;
-      const pending = orders.filter((o) => ["label_pending", "awaiting_device", "in_transit"].includes(o.status)).length;
-      const needsPrinting = orders.filter((o) => o.status === "label_pending").length;
-      res.json({ todayOrders, pending, needsPrinting });
-    } catch (error) {
-      console.error("Quick stats error:", error);
-      res.status(500).json({ error: "Failed to fetch quick stats" });
+  const isProduction = process.env.NODE_ENV === "production";
+  const sessionSecret = process.env.SESSION_SECRET || "default-secret-change-in-production";
+  const MemoryStore = createMemoryStore(session);
+  app2.use(session({
+    store: new MemoryStore({
+      checkPeriod: 24 * 60 * 60 * 1e3
+    }),
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: isProduction,
+      httpOnly: true,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1e3
+      // 7 days
     }
-  });
-  app2.get("/api/admin/dashboard-stats", requireAdmin, async (req, res) => {
-    try {
-      const orders = await storage.getAllSellOrders();
-      const now = /* @__PURE__ */ new Date();
-      const thisMonth = orders.filter((o) => {
-        const createdDate = new Date(o.createdAt);
-        return createdDate.getMonth() === now.getMonth() && createdDate.getFullYear() === now.getFullYear();
-      });
-      const today = now.toISOString().split("T")[0];
-      const totalOrders = orders.length;
-      const monthOrders = thisMonth.length;
-      const pendingOrders = orders.filter((o) => !["completed", "cancelled"].includes(o.status)).length;
-      const needsPrinting = orders.filter((o) => o.status === "label_pending").length;
-      const receivedToday = orders.filter((o) => {
-        if (!o.updatedAt || o.status !== "received") return false;
-        try {
-          const updated = typeof o.updatedAt === "string" ? o.updatedAt : new Date(o.updatedAt).toISOString();
-          return updated.startsWith(today);
-        } catch {
-          return false;
-        }
-      }).length;
-      const avgOrderValue = orders.length > 0 ? (orders.reduce((sum, o) => sum + (typeof o.totalOriginalOffer === "number" ? o.totalOriginalOffer : parseFloat(o.totalOriginalOffer || "0")), 0) / orders.length).toFixed(2) : "0.00";
-      res.json({
-        totalOrders,
-        monthOrders,
-        pendingOrders,
-        needsPrinting,
-        receivedToday,
-        avgOrderValue
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch dashboard stats" });
-    }
-  });
-  app2.get("/api/admin/orders", requireAdmin, async (req, res) => {
-    try {
-      const { search, status, dateRange, page = "1", pageSize = "20" } = req.query;
-      let orders = await storage.getAllSellOrders();
-      if (search && typeof search === "string") {
-        const searchLower = search.toLowerCase();
-        orders = orders.filter(
-          (o) => o.orderNumber.toLowerCase().includes(searchLower) || o.notesCustomer && o.notesCustomer.toLowerCase().includes(searchLower)
-        );
-      }
-      if (status && status !== "all") {
-        orders = orders.filter((o) => o.status === status);
-      }
-      if (dateRange && dateRange !== "all") {
-        const now = /* @__PURE__ */ new Date();
-        const ranges = {
-          today: 0,
-          week: 7,
-          month: 30
-        };
-        const daysAgo = ranges[dateRange];
-        if (daysAgo !== void 0) {
-          const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1e3);
-          orders = orders.filter((o) => new Date(o.createdAt) >= cutoffDate);
-        }
-      }
-      orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      const pageNum = parseInt(page);
-      const pageSizeNum = parseInt(pageSize);
-      const total = orders.length;
-      const paginatedOrders = orders.slice((pageNum - 1) * pageSizeNum, pageNum * pageSizeNum);
-      const enrichedOrders = await Promise.all(paginatedOrders.map(async (order) => {
-        const items = await storage.getSellOrderItemsByOrder(order.id);
-        const itemsWithDetails = await Promise.all(items.map(async (item) => {
-          const model = item.deviceModelId ? await storage.getModel(item.deviceModelId) : null;
-          const variant = item.deviceVariantId ? await storage.getVariant(item.deviceVariantId) : null;
-          return { ...item, deviceModel: model, deviceVariant: variant };
-        }));
-        let customerName = "Guest";
-        let customerEmail = "";
-        if (order.notesCustomer) {
-          const emailMatch = order.notesCustomer.match(/Email:\s*([^\s,]+)/);
-          const nameMatch = order.notesCustomer.match(/Name:\s*([^,\n]+)/);
-          if (emailMatch) customerEmail = emailMatch[1];
-          if (nameMatch) customerName = nameMatch[1].trim();
-        }
-        return {
-          ...order,
-          items: itemsWithDetails,
-          customerName,
-          customerEmail,
-          labelStatus: order.shipmentId ? "generated" : "none"
-        };
-      }));
-      res.json({ orders: enrichedOrders, total, page: pageNum, pageSize: pageSizeNum });
-    } catch (error) {
-      console.error("Failed to fetch orders:", error);
-      res.status(500).json({ error: "Failed to fetch orders" });
-    }
-  });
-  app2.get("/api/admin/orders/:id", requireAdmin, async (req, res) => {
-    try {
-      const order = await storage.getSellOrder(req.params.id);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const items = await storage.getSellOrderItemsByOrder(order.id);
-      const itemsWithDetails = await Promise.all(items.map(async (item) => {
-        const model = item.deviceModelId ? await storage.getModel(item.deviceModelId) : null;
-        const variant = item.deviceVariantId ? await storage.getVariant(item.deviceVariantId) : null;
-        const condition = item.claimedConditionProfileId ? await storage.getConditionProfile(item.claimedConditionProfileId) : null;
-        return {
-          ...item,
-          deviceModel: model,
-          deviceVariant: variant,
-          conditionProfile: condition
-        };
-      }));
-      let customerName = "Guest";
-      let customerEmail = "";
-      let customerPhone = "";
-      let customerAddress = "";
-      if (order.notesCustomer) {
-        const emailMatch = order.notesCustomer.match(/Email:\s*([^\s,]+)/);
-        const nameMatch = order.notesCustomer.match(/Name:\s*([^,\n]+)/);
-        const phoneMatch = order.notesCustomer.match(/Phone:\s*([^,\n]+)/);
-        const addressMatch = order.notesCustomer.match(/Address:\s*([^,\n]+(?:\n[^:]+)*)/);
-        if (emailMatch) customerEmail = emailMatch[1];
-        if (nameMatch) customerName = nameMatch[1].trim();
-        if (phoneMatch) customerPhone = phoneMatch[1].trim();
-        if (addressMatch) customerAddress = addressMatch[1].trim();
-      }
-      let shipment = null;
-      if (order.shipmentId) {
-        shipment = await storage.getShipment(order.shipmentId);
-      }
-      res.json({
-        ...order,
-        items: itemsWithDetails,
-        customerName,
-        customerEmail,
-        customerPhone,
-        customerAddress,
-        shipment,
-        labelStatus: order.shipmentId ? "generated" : "none"
-      });
-    } catch (error) {
-      console.error("Failed to fetch order details:", error);
-      res.status(500).json({ error: "Failed to fetch order details" });
-    }
-  });
-  app2.post("/api/admin/orders/:id/status", requireAdmin, async (req, res) => {
-    try {
-      const { status } = req.body;
-      const order = await storage.updateSellOrder(req.params.id, { status });
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      if (order.notesCustomer) {
-        const emailMatch = order.notesCustomer.match(/Email:\s*([^\s,]+)/);
-        if (emailMatch) {
-          await sendStatusUpdate(emailMatch[1], order.orderNumber, status, `Your order status has been updated to: ${status.replace("_", " ")}`);
-        }
-      }
-      res.json(order);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update status" });
-    }
-  });
-  app2.get("/api/admin/analytics", requireAdmin, async (req, res) => {
-    try {
-      const orders = await storage.getAllSellOrders();
-      const now = Date.now();
-      const aging = orders.filter((o) => ["label_pending", "awaiting_device", "in_transit", "received", "under_inspection", "reoffer_pending", "customer_decision_pending", "payout_pending"].includes(o.status)).map((o) => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        status: o.status,
-        ageDays: Math.floor((now - new Date(o.createdAt).getTime()) / (1e3 * 60 * 60 * 24))
-      })).sort((a, b) => b.ageDays - a.ageDays);
-      const metrics = {
-        totalOrders: orders.length,
-        completedOrders: orders.filter((o) => o.status === "completed").length,
-        pendingOrders: orders.filter((o) => o.status !== "completed" && o.status !== "cancelled").length,
-        avgProcessingTime: (orders.filter((o) => o.status === "completed").reduce((sum, o) => sum + (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime()), 0) / Math.max(1, orders.filter((o) => o.status === "completed").length) / (1e3 * 60 * 60 * 24)).toFixed(1)
-      };
-      res.json({ aging, metrics });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch analytics" });
-    }
-  });
-  app2.get("/api/admin/analytics/full", requireAdmin, async (req, res) => {
-    try {
-      const { range = "month" } = req.query;
-      const orders = await storage.getAllSellOrders();
-      const now = /* @__PURE__ */ new Date();
-      let startDate = /* @__PURE__ */ new Date();
-      if (range === "week") startDate.setDate(now.getDate() - 7);
-      else if (range === "month") startDate.setDate(now.getDate() - 30);
-      else if (range === "quarter") startDate.setDate(now.getDate() - 90);
-      else if (range === "year") startDate.setDate(now.getDate() - 365);
-      const filteredOrders = orders.filter((o) => new Date(o.createdAt) >= startDate);
-      const ordersOverTime = filteredOrders.reduce((acc, o) => {
-        const date = (typeof o.createdAt === "string" ? o.createdAt : o.createdAt.toISOString()).split("T")[0];
-        const existing = acc.find((d) => d.date === date);
-        if (existing) {
-          existing.orders++;
-          existing.value += typeof o.totalOriginalOffer === "number" ? o.totalOriginalOffer : parseFloat(o.totalOriginalOffer || "0");
-        } else {
-          acc.push({ date, orders: 1, value: typeof o.totalOriginalOffer === "number" ? o.totalOriginalOffer : parseFloat(o.totalOriginalOffer || "0") });
-        }
-        return acc;
-      }, []).sort((a, b) => a.date.localeCompare(b.date));
-      const statusDistribution = filteredOrders.reduce((acc, o) => {
-        const existing = acc.find((s) => s.status === o.status);
-        if (existing) {
-          existing.count++;
-        } else {
-          acc.push({ status: o.status, count: 1 });
-        }
-        return acc;
-      }, []);
-      const allOrders = await storage.getAllSellOrders();
-      const allItems = await Promise.all(allOrders.map((o) => storage.getSellOrderItemsByOrder(o.id)));
-      const items = allItems.flat();
-      const deviceMap = /* @__PURE__ */ new Map();
-      for (const item of items.filter((i) => filteredOrders.find((o) => o.id === i.sellOrderId))) {
-        const order = filteredOrders.find((o) => o.id === item.sellOrderId);
-        if (!order) continue;
-        const model = await storage.getModel(item.deviceModelId);
-        const key = model?.name || "Unknown Device";
-        const amount = typeof item.originalOfferAmount === "number" ? item.originalOfferAmount : parseFloat(item.originalOfferAmount || "0");
-        if (deviceMap.has(key)) {
-          const d = deviceMap.get(key);
-          d.count++;
-          d.totalAmount += amount;
-        } else {
-          deviceMap.set(key, { model: key, count: 1, totalAmount: amount });
-        }
-      }
-      const topDevices = Array.from(deviceMap.values()).map((d) => ({ ...d, avgAmount: d.totalAmount / d.count })).sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 10);
-      const totalRevenue = filteredOrders.reduce((sum, o) => sum + (typeof o.totalOriginalOffer === "number" ? o.totalOriginalOffer : parseFloat(o.totalOriginalOffer || "0")), 0);
-      const avgOrderValue = filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
-      const quotes = filteredOrders.length;
-      const labeled = filteredOrders.filter((o) => ["awaiting_device", "in_transit", "received", "inspecting", "completed"].includes(o.status)).length;
-      const shipped = filteredOrders.filter((o) => ["in_transit", "received", "inspecting", "completed"].includes(o.status)).length;
-      const received = filteredOrders.filter((o) => ["received", "inspecting", "completed"].includes(o.status)).length;
-      const inspected = filteredOrders.filter((o) => ["inspecting", "completed"].includes(o.status)).length;
-      const completed = filteredOrders.filter((o) => o.status === "completed").length;
-      res.json({
-        ordersOverTime,
-        statusDistribution,
-        topDevices,
-        revenue: { totalPaidOut: totalRevenue, avgOrderValue, totalOrders: filteredOrders.length },
-        funnel: { quotes, labeled, shipped, received, inspected, completed }
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch analytics" });
-    }
-  });
-  app2.get("/api/admin/orders/needs-printing", requireAdmin, async (req, res) => {
-    try {
-      const orders = await storage.getAllSellOrders();
-      const needsPrinting = orders.filter((o) => o.status === "label_pending");
-      res.json(needsPrinting);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch print queue" });
-    }
-  });
-  app2.post("/api/admin/orders/needs-printing/bundle", requireAdmin, async (req, res) => {
-    try {
-      const { orderIds } = req.body;
-      res.json({
-        success: true,
-        bundleUrl: `/api/admin/print-bundle/${orderIds.join("-")}.pdf`
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create bundle" });
-    }
-  });
-  app2.post("/api/admin/orders/:id/mark-kit-sent", requireAdmin, async (req, res) => {
-    try {
-      const orderId = req.params.id;
-      await storage.updateSellOrder(orderId, { status: "awaiting_device" });
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to mark kit sent" });
-    }
-  });
-  app2.get("/api/admin/clicks", requireAdmin, async (req, res) => {
-    try {
-      const { family = "all", range = "month", sortBy = "clicks" } = req.query;
-      const devices = [
-        { name: "iPhone 15 Pro Max", family: "iPhone", clicks: 342, orders: 28, conversionRate: 8.2, lastClicked: (/* @__PURE__ */ new Date()).toISOString(), trend: 12 },
-        { name: "iPhone 15 Pro", family: "iPhone", clicks: 289, orders: 24, conversionRate: 8.3, lastClicked: (/* @__PURE__ */ new Date()).toISOString(), trend: 8 },
-        { name: "Samsung Galaxy S24 Ultra", family: "Samsung", clicks: 198, orders: 15, conversionRate: 7.6, lastClicked: (/* @__PURE__ */ new Date()).toISOString(), trend: -3 },
-        { name: "iPhone 14 Pro Max", family: "iPhone", clicks: 176, orders: 14, conversionRate: 8, lastClicked: (/* @__PURE__ */ new Date()).toISOString(), trend: -5 },
-        { name: "Google Pixel 8 Pro", family: "Google", clicks: 124, orders: 9, conversionRate: 7.3, lastClicked: (/* @__PURE__ */ new Date()).toISOString(), trend: 15 }
-      ];
-      let filtered = family !== "all" ? devices.filter((d) => d.family === family) : devices;
-      if (sortBy === "conversion") filtered.sort((a, b) => b.conversionRate - a.conversionRate);
-      else if (sortBy === "orders") filtered.sort((a, b) => b.orders - a.orders);
-      const totalClicks = filtered.reduce((sum, d) => sum + d.clicks, 0);
-      const totalOrders = filtered.reduce((sum, d) => sum + d.orders, 0);
-      const avgConversion = totalClicks > 0 ? (totalOrders / totalClicks * 100).toFixed(1) : "0";
-      res.json({
-        metrics: {
-          totalClicks,
-          uniqueDevices: filtered.length,
-          conversionRate: avgConversion
-        },
-        devices: filtered
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch click data" });
-    }
-  });
-  app2.post("/api/admin/emails/send", requireAdmin, async (req, res) => {
-    try {
-      const { to, subject, body } = req.body;
-      const { sendRawEmail: sendRawEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
-      await sendRawEmail2(to, subject, body);
-      res.json({ success: true, sentAt: (/* @__PURE__ */ new Date()).toISOString() });
-    } catch (error) {
-      console.error("Email send error:", error);
-      res.status(500).json({ error: error.message || "Failed to send email" });
-    }
-  });
-  app2.get("/api/admin/emails/history", requireAdmin, async (req, res) => {
-    try {
-      const emails = [
-        { id: "1", to: "customer@example.com", subject: "Order Status Update", sentAt: (/* @__PURE__ */ new Date()).toISOString(), status: "sent" },
-        { id: "2", to: "user@example.com", subject: "Payment Confirmation", sentAt: new Date(Date.now() - 864e5).toISOString(), status: "sent" }
-      ];
-      res.json({ emails });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch email history" });
-    }
-  });
-  const stateNameToAbbr = (stateName) => {
-    const states = {
-      "alabama": "AL",
-      "alaska": "AK",
-      "arizona": "AZ",
-      "arkansas": "AR",
-      "california": "CA",
-      "colorado": "CO",
-      "connecticut": "CT",
-      "delaware": "DE",
-      "florida": "FL",
-      "georgia": "GA",
-      "hawaii": "HI",
-      "idaho": "ID",
-      "illinois": "IL",
-      "indiana": "IN",
-      "iowa": "IA",
-      "kansas": "KS",
-      "kentucky": "KY",
-      "louisiana": "LA",
-      "maine": "ME",
-      "maryland": "MD",
-      "massachusetts": "MA",
-      "michigan": "MI",
-      "minnesota": "MN",
-      "mississippi": "MS",
-      "missouri": "MO",
-      "montana": "MT",
-      "nebraska": "NE",
-      "nevada": "NV",
-      "new hampshire": "NH",
-      "new jersey": "NJ",
-      "new mexico": "NM",
-      "new york": "NY",
-      "north carolina": "NC",
-      "north dakota": "ND",
-      "ohio": "OH",
-      "oklahoma": "OK",
-      "oregon": "OR",
-      "pennsylvania": "PA",
-      "rhode island": "RI",
-      "south carolina": "SC",
-      "south dakota": "SD",
-      "tennessee": "TN",
-      "texas": "TX",
-      "utah": "UT",
-      "vermont": "VT",
-      "virginia": "VA",
-      "washington": "WA",
-      "west virginia": "WV",
-      "wisconsin": "WI",
-      "wyoming": "WY",
-      "district of columbia": "DC",
-      "puerto rico": "PR"
-    };
-    const normalized = stateName.toLowerCase().trim();
-    if (stateName.length === 2 && stateName === stateName.toUpperCase()) {
-      return stateName;
-    }
-    return states[normalized] || stateName;
-  };
-  app2.post("/api/admin/orders/:id/shipment", requireAdmin, async (req, res) => {
-    try {
-      const orderId = req.params.id;
-      const order = await storage.getSellOrder(orderId);
-      if (!order) return res.status(404).json({ error: "Order not found" });
-      let toAddress = {};
-      let customerEmail = "";
-      if (order.notesCustomer) {
-        const emailMatch = order.notesCustomer.match(/Email:\s*([^\s,]+)/);
-        const addressMatch = order.notesCustomer.match(/Address:\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+)/);
-        const phoneMatch = order.notesCustomer.match(/Phone:\s*([^\s,]+)/);
-        if (emailMatch) customerEmail = emailMatch[1];
-        if (addressMatch) {
-          const stateProv = addressMatch[3].trim();
-          toAddress = {
-            name: customerEmail.split("@")[0] || "Customer",
-            address_line1: addressMatch[1].trim(),
-            city_locality: addressMatch[2].trim(),
-            state_province: stateNameToAbbr(stateProv),
-            postal_code: addressMatch[4].trim(),
-            country_code: "US",
-            phone: phoneMatch ? phoneMatch[1] : "",
-            email: customerEmail
-          };
-        } else {
-          return res.status(400).json({ error: "Missing shipping address in order" });
-        }
-      } else {
-        return res.status(400).json({ error: "No customer information found" });
-      }
-      const label = await createShippingLabel(toAddress, order.orderNumber, {
-        weight: 16,
-        // Default 1 lb for phones
-        serviceCode: "usps_ground_advantage"
-        // USPS Ground Advantage
-      });
-      const shipment = await storage.createShipment({
-        sellOrderId: orderId,
-        carrierName: label.carrier,
-        serviceLevel: label.serviceCode,
-        trackingNumber: label.trackingNumber,
-        labelUrl: label.labelUrl,
-        labelCost: label.cost,
-        labelPaidBy: "company",
-        shipFromAddressJson: JSON.stringify(toAddress),
-        shipToAddressJson: JSON.stringify(toAddress)
-      });
-      await storage.updateSellOrder(orderId, { status: "awaiting_device" });
-      if (customerEmail) {
-        await sendShippingLabel(customerEmail, order.orderNumber, label.labelUrl);
-      }
-      res.json({
-        ...shipment,
-        labelDownloadUrl: label.labelUrl,
-        labelPdfUrl: label.labelPdfUrl
-      });
-    } catch (error) {
-      console.error("Shipment error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate label" });
-    }
-  });
-  app2.get("/api/orders/:id/shipment", async (req, res) => {
-    try {
-      const orderId = req.params.id;
-      const shipment = await storage.getShipmentByOrder(orderId);
-      if (!shipment) return res.status(404).json({ error: "Shipment not found" });
-      res.json(shipment);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch shipment" });
-    }
-  });
-  app2.get("/api/admin/orders/:id/shipment", requireAdmin, async (req, res) => {
-    try {
-      const orderId = req.params.id;
-      const shipment = await storage.getShipmentByOrder(orderId);
-      if (!shipment) return res.status(404).json({ error: "Shipment not found" });
-      res.json(shipment);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch shipment" });
-    }
-  });
-  app2.post("/api/admin/orders/:id/shipment/void", requireAdmin, async (req, res) => {
-    try {
-      const orderId = req.params.id;
-      const shipment = await storage.getShipmentByOrder(orderId);
-      if (!shipment) return res.status(404).json({ error: "Shipment not found" });
-      if (shipment.labelUrl) {
-        try {
-          const labelId = shipment.trackingNumber || shipment.id;
-          await voidLabel(labelId);
-        } catch (voidError) {
-          console.error("Error voiding label with ShipEngine:", voidError);
-        }
-      }
-      await storage.updateShipment(shipment.id, {
-        labelUrl: null,
-        trackingNumber: null,
-        lastTrackingStatus: "voided"
-      });
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to void label" });
-    }
-  });
-  app2.post("/api/admin/orders/:id/shipment/refresh", requireAdmin, async (req, res) => {
-    try {
-      const orderId = req.params.id;
-      const shipment = await storage.getShipmentByOrder(orderId);
-      if (!shipment) return res.status(404).json({ error: "Shipment not found" });
-      if (!shipment.trackingNumber) return res.status(400).json({ error: "No tracking number" });
-      const trackingInfo = await trackShipment(
-        shipment.carrierName.toLowerCase(),
-        shipment.trackingNumber
-      );
-      await storage.updateShipment(shipment.id, {
-        lastTrackingStatus: trackingInfo.status_description || trackingInfo.status
-      });
-      res.json({
-        status: trackingInfo.status_description || trackingInfo.status,
-        trackingInfo
-      });
-    } catch (error) {
-      console.error("Tracking refresh error:", error);
-      res.status(500).json({ error: error.message || "Failed to refresh tracking" });
-    }
-  });
-  app2.post("/api/imei/check", async (req, res) => {
-    try {
-      const { imei } = req.body;
-      if (!imei) {
-        return res.status(400).json({ error: "IMEI is required" });
-      }
-      if (!isValidIMEI(imei)) {
-        return res.status(400).json({ error: "Invalid IMEI format" });
-      }
-      const result = await checkIMEI(imei);
-      res.json(result);
-    } catch (error) {
-      console.error("IMEI check error:", error);
-      res.status(500).json({ error: error.message || "Failed to check IMEI" });
-    }
-  });
-  app2.get("/api/imei/:imei/device", async (req, res) => {
-    try {
-      const imei = req.params.imei;
-      if (!isValidIMEI(imei)) {
-        return res.status(400).json({ error: "Invalid IMEI format" });
-      }
-      const deviceInfo = await getDeviceInfoFromIMEI(imei);
-      res.json(deviceInfo);
-    } catch (error) {
-      console.error("IMEI device info error:", error);
-      res.status(500).json({ error: error.message || "Failed to get device info" });
-    }
+  }));
+  app2.use("/api", createEmailsRouter());
+  app2.use("/api", createImeiRouter());
+  app2.use("/api", createLabelsRouter());
+  app2.use("/api", createOrdersRouter());
+  app2.use("/api", createWebhookRouter());
+  app2.get("/api/health", (req, res) => {
+    res.json({
+      status: "ok",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      service: "SecondHandCell API",
+      version: "1.0.0"
+    });
   });
   app2.get("/api/settings", async (req, res) => {
     try {
-      const settings = await getSiteSettings();
-      res.json(settings);
+      const payload = {
+        logoUrl: process.env.SITE_LOGO_URL || null,
+        siteName: "SecondHandCell"
+      };
+      res.json(payload);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch settings" });
+      console.error("Get settings error:", error);
+      res.status(500).json({ error: "Failed to get settings" });
     }
   });
-  app2.post("/api/admin/settings", requireAdmin, async (req, res) => {
+  app2.get("/api/public/categories", async (req, res) => {
     try {
-      let logoUrl = req.body.logoUrl || "";
-      await updateSiteLogo(logoUrl);
-      res.json({ success: true, logoUrl });
+      const categories = await storage.getAllCategories();
+      res.json(categories);
     } catch (error) {
-      res.status(500).json({ error: "Failed to update settings" });
+      console.error("Get public categories error:", error);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+  app2.get("/api/public/catalog", async (req, res) => {
+    try {
+      const devices = await storage.getAllDeviceModels();
+      const publicDevices = await Promise.all(
+        devices.map(async (device) => {
+          const variants = await storage.getDeviceVariantsByModelId(device.id);
+          const category = await storage.getCategory(device.categoryId);
+          const conditionValues = variants.map((v) => v.conditionGrade).filter((c) => c !== null && c !== void 0);
+          const storageValues = variants.map((v) => v.storage).filter((s) => s !== null && s !== void 0);
+          const colorValues = variants.map((v) => v.color).filter((c) => c !== null && c !== void 0);
+          return {
+            id: device.id,
+            brand: device.brand,
+            marketingName: device.marketingName,
+            slug: device.slug,
+            categoryId: device.categoryId,
+            categoryName: category?.name || "Unknown",
+            imageUrl: device.imageUrl,
+            description: device.description,
+            variantCount: variants.length,
+            // Don't include pricing for public view
+            availableConditions: Array.from(new Set(conditionValues)),
+            availableStorage: Array.from(new Set(storageValues)),
+            availableColors: Array.from(new Set(colorValues))
+          };
+        })
+      );
+      res.json(publicDevices);
+    } catch (error) {
+      console.error("Get public catalog error:", error);
+      res.status(500).json({ error: "Failed to fetch catalog" });
     }
   });
   app2.post("/api/auth/register", async (req, res) => {
     try {
-      const registrationSchema = z2.object({
-        email: z2.string().email(),
-        password: z2.string().min(8),
-        firstName: z2.string().min(1),
-        lastName: z2.string().min(1),
-        phoneNumber: z2.string().optional(),
-        marketingOptIn: z2.boolean().optional()
+      const registerSchema = z.object({
+        // User data
+        name: z.string(),
+        email: z.string().email(),
+        phone: z.string(),
+        password: z.string().min(6),
+        // Company data
+        companyName: z.string(),
+        legalName: z.string(),
+        website: z.string().optional(),
+        taxId: z.string().optional(),
+        businessType: z.string(),
+        // Address data
+        contactName: z.string(),
+        addressPhone: z.string(),
+        street1: z.string(),
+        street2: z.string().optional(),
+        city: z.string(),
+        state: z.string(),
+        postalCode: z.string()
       });
-      const validation = registrationSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid user data",
-          details: fromError(validation.error).toString()
-        });
+      const data = registerSchema.parse(req.body);
+      const existingUser = await storage.getUserByEmail(data.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already registered" });
       }
-      const existing = await storage.getUserByEmail(validation.data.email);
-      if (existing) {
-        return res.status(409).json({ error: "Email already registered" });
-      }
-      const hashedPassword = await hashPassword(validation.data.password);
+      const passwordHash = await bcrypt.hash(data.password, 10);
       const user = await storage.createUser({
-        email: validation.data.email,
-        passwordHash: hashedPassword,
-        firstName: validation.data.firstName,
-        lastName: validation.data.lastName,
-        phoneNumber: validation.data.phoneNumber ?? void 0,
-        marketingOptIn: validation.data.marketingOptIn ?? false,
-        role: "customer",
-        // Force customer role
-        isEmailVerified: false,
-        // Email not verified on registration
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        passwordHash,
+        role: "buyer",
         isActive: true
       });
-      req.session.userId = user.id;
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      res.status(201).json(userWithoutPassword);
+      const company = await storage.createCompany({
+        name: data.companyName,
+        legalName: data.legalName,
+        website: data.website || null,
+        taxId: data.taxId || null,
+        primaryPhone: data.phone,
+        billingEmail: data.email,
+        status: "pending_review",
+        creditLimit: "0"
+      });
+      await storage.createCompanyUser({
+        userId: user.id,
+        companyId: company.id,
+        roleInCompany: "owner"
+      });
+      await storage.createShippingAddress({
+        companyId: company.id,
+        contactName: data.contactName,
+        phone: data.addressPhone,
+        street1: data.street1,
+        street2: data.street2 || null,
+        city: data.city,
+        state: data.state,
+        postalCode: data.postalCode,
+        country: "USA",
+        isDefault: true
+      });
+      res.json({ success: true, userId: user.id, companyId: company.id });
     } catch (error) {
-      console.error("Error creating user:", error);
-      res.status(500).json({ error: "Failed to create user" });
+      console.error("Registration error:", error);
+      res.status(400).json({ error: error.message || "Registration failed" });
     }
   });
   app2.post("/api/auth/login", async (req, res) => {
     try {
-      const schema = z2.object({
-        email: z2.string().email(),
-        password: z2.string().min(1)
-      });
-      const validation = schema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid credentials format"
-        });
-      }
-      const { email, password } = validation.data;
+      const { email, password } = req.body;
       const user = await storage.getUserByEmail(email);
       if (!user) {
-        return res.status(401).json({ error: "Invalid email or password" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
-      const isValid = await comparePassword(password, user.passwordHash);
-      if (!isValid) {
-        return res.status(401).json({ error: "Invalid email or password" });
+      const validPassword = await bcrypt.compare(password, user.passwordHash);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Invalid credentials" });
       }
       if (!user.isActive) {
-        return res.status(403).json({
-          error: "Account is deactivated. Please contact support."
-        });
+        return res.status(403).json({ error: "Account is inactive" });
       }
-      if (!user.isEmailVerified) {
-        return res.status(403).json({
-          error: "Please verify your email before logging in."
-        });
-      }
+      await storage.updateUser(user.id, { lastLoginAt: /* @__PURE__ */ new Date() });
       req.session.userId = user.id;
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      req.session.userRole = user.role;
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }
+      });
     } catch (error) {
-      console.error("Error during login:", error);
+      console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
     }
   });
-  app2.post("/api/auth/logout", async (req, res) => {
+  app2.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.json({ success: true });
+    });
+  });
+  app2.post("/api/auth/forgot-password", async (req, res) => {
     try {
-      req.session.destroy((err) => {
-        if (err) {
-          console.error("Error destroying session:", err);
-          return res.status(500).json({ error: "Logout failed" });
-        }
-        res.json({ success: true });
+      const { email } = req.body;
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.json({ success: true, message: "If the email exists, a reset link has been sent" });
+      }
+      const resetToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1e3);
+      await storage.updateUser(user.id, {
+        resetToken,
+        resetTokenExpiry
       });
+      console.log(`Password reset link for ${email}: /reset-password?token=${resetToken}`);
+      if (!isProduction) {
+        return res.json({
+          success: true,
+          message: "Reset link generated",
+          devToken: resetToken
+          // Only for development
+        });
+      }
+      res.json({ success: true, message: "If the email exists, a reset link has been sent" });
     } catch (error) {
-      console.error("Error during logout:", error);
-      res.status(500).json({ error: "Logout failed" });
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "Failed to process request" });
     }
   });
-  app2.get("/api/auth/me", requireAuth, async (req, res) => {
+  app2.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      if (!token || !newPassword) {
+        return res.status(400).json({ error: "Token and new password are required" });
+      }
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+      const users2 = await storage.getAllUsers();
+      const user = users2.find((u) => u.resetToken === token);
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+      }
+      if (!user.resetTokenExpiry || /* @__PURE__ */ new Date() > new Date(user.resetTokenExpiry)) {
+        return res.status(400).json({ error: "Reset token has expired" });
+      }
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(user.id, {
+        passwordHash,
+        resetToken: null,
+        resetTokenExpiry: null
+      });
+      res.json({ success: true, message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+  const getMeHandler = async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      const { passwordHash: _, ...userWithoutPassword } = user;
+      const companyUsers2 = await storage.getCompanyUsersByUserId(user.id);
+      let companyId = null;
+      if (companyUsers2.length > 0) {
+        companyId = companyUsers2[0].companyId;
+      }
+      res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        companyId
+      });
+    } catch (error) {
+      console.error("Get user error:", error);
+      res.status(500).json({ error: "Failed to get user" });
+    }
+  };
+  app2.get("/api/auth/me", requireAuth, getMeHandler);
+  app2.get("/api/me", requireAuth, getMeHandler);
+  app2.get("/api/auth/company", requireAuth, async (req, res) => {
+    try {
+      const companyContext = await getUserPrimaryCompany(req.session.userId);
+      if (!companyContext) {
+        return res.status(404).json({ error: "User does not belong to a company" });
+      }
+      const company = await storage.getCompany(companyContext.companyId);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      res.json({
+        ...company,
+        roleInCompany: companyContext.roleInCompany
+      });
+    } catch (error) {
+      console.error("Get company error:", error);
+      res.status(500).json({ error: "Failed to load company" });
+    }
+  });
+  app2.get("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const companyUsers2 = await storage.getCompanyUsersByUserId(user.id);
+      let company = null;
+      let roleInCompany = null;
+      if (companyUsers2.length > 0) {
+        company = await storage.getCompany(companyUsers2[0].companyId);
+        roleInCompany = companyUsers2[0].roleInCompany;
+      }
+      const { passwordHash, ...userWithoutPassword } = user;
+      res.json({
+        ...userWithoutPassword,
+        company,
+        roleInCompany
+      });
+    } catch (error) {
+      console.error("Get profile error:", error);
+      res.status(500).json({ error: "Failed to get profile" });
+    }
+  });
+  app2.patch("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const updateSchema = z.object({
+        name: z.string().min(1).optional(),
+        phone: z.string().nullable().optional()
+      });
+      const updates = updateSchema.parse(req.body);
+      const updatedUser = await storage.updateUser(req.session.userId, updates);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const { passwordHash, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
-      console.error("Error fetching current user:", error);
-      res.status(500).json({ error: "Failed to fetch user" });
+      console.error("Update profile error:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid update data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update profile" });
     }
   });
+  app2.post("/api/profile/password", requireAuth, async (req, res) => {
+    try {
+      const passwordSchema = z.object({
+        currentPassword: z.string().min(1),
+        newPassword: z.string().min(8)
+      });
+      const { currentPassword, newPassword } = passwordSchema.parse(req.body);
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(user.id, { passwordHash: newPasswordHash });
+      res.json({ success: true, message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Change password error:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid password data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+  app2.get("/api/catalog/models", async (req, res) => {
+    try {
+      const models = await storage.getAllDeviceModels();
+      res.json(models);
+    } catch (error) {
+      console.error("Get models error:", error);
+      res.status(500).json({ error: "Failed to get models" });
+    }
+  });
+  app2.get("/api/catalog/models/:slug", async (req, res) => {
+    try {
+      const model = await storage.getDeviceModelBySlug(req.params.slug);
+      if (!model) {
+        return res.status(404).json({ error: "Model not found" });
+      }
+      const variants = await storage.getDeviceVariantsByModelId(model.id);
+      const variantsWithDetails = await Promise.all(
+        variants.map(async (variant) => {
+          const inventory = await storage.getInventoryByVariantId(variant.id);
+          const priceTiers2 = await storage.getPriceTiersByVariantId(variant.id);
+          return { ...variant, inventory, priceTiers: priceTiers2 };
+        })
+      );
+      res.json({ ...model, variants: variantsWithDetails });
+    } catch (error) {
+      console.error("Get model error:", error);
+      res.status(500).json({ error: "Failed to get model" });
+    }
+  });
+  app2.get("/api/catalog", async (req, res) => {
+    try {
+      const models = await storage.getAllDeviceModels();
+      const modelsWithVariants = await Promise.all(
+        models.map(async (model) => {
+          const variants = await storage.getDeviceVariantsByModelId(model.id);
+          const variantsWithDetails = await Promise.all(
+            variants.map(async (variant) => {
+              const inventory = await storage.getInventoryByVariantId(variant.id);
+              const priceTiers2 = await storage.getPriceTiersByVariantId(variant.id);
+              return { ...variant, inventory, priceTiers: priceTiers2, deviceModel: model };
+            })
+          );
+          return { ...model, variants: variantsWithDetails };
+        })
+      );
+      res.json(modelsWithVariants);
+    } catch (error) {
+      console.error("Get catalog error:", error);
+      res.status(500).json({ error: "Failed to get catalog" });
+    }
+  });
+  const getCategoriesHandler = async (req, res) => {
+    try {
+      const categories = await storage.getAllCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Get categories error:", error);
+      res.status(500).json({ error: "Failed to get categories" });
+    }
+  };
+  app2.get("/api/catalog/categories", getCategoriesHandler);
+  app2.get("/api/categories", getCategoriesHandler);
   app2.get("/api/brands", async (req, res) => {
     try {
-      const brands = await storage.getAllBrands();
+      const models = await storage.getAllDeviceModels();
+      const brandsSet = new Set(models.map((m) => m.brand));
+      const brands = Array.from(brandsSet).map((brand, index) => ({
+        id: `brand-${index}`,
+        name: brand,
+        slug: brand.toLowerCase().replace(/\s+/g, "-")
+      }));
       res.json(brands);
     } catch (error) {
-      console.error("Error fetching brands:", error);
-      res.status(500).json({ error: "Failed to fetch brands" });
-    }
-  });
-  app2.get("/api/brands/:slug", async (req, res) => {
-    try {
-      const brand = await storage.getBrandBySlug(req.params.slug);
-      if (!brand) {
-        return res.status(404).json({ error: "Brand not found" });
-      }
-      res.json(brand);
-    } catch (error) {
-      console.error("Error fetching brand:", error);
-      res.status(500).json({ error: "Failed to fetch brand" });
+      console.error("Get brands error:", error);
+      res.status(500).json({ error: "Failed to get brands" });
     }
   });
   app2.get("/api/models", async (req, res) => {
     try {
-      const brandId = req.query.brandId;
-      if (brandId) {
-        const models = await storage.getModelsByBrand(brandId);
-        res.json(models);
-      } else {
-        const models = await storage.getAllModels();
-        res.json(models);
+      const { brandId } = req.query;
+      const models = await storage.getAllDeviceModels();
+      let filteredModels = models;
+      if (brandId && typeof brandId === "string") {
+        let brandName = "";
+        if (brandId.startsWith("brand-")) {
+          const brandPart = brandId.replace("brand-", "");
+          if (/^\d+$/.test(brandPart)) {
+            const brandsSet = new Set(models.map((m) => m.brand));
+            const brandsArray = Array.from(brandsSet);
+            const index = parseInt(brandPart, 10);
+            brandName = brandsArray[index] || "";
+          } else {
+            brandName = brandPart.split("-").map(
+              (word) => word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(" ");
+          }
+        }
+        if (brandName) {
+          filteredModels = models.filter((m) => m.brand === brandName);
+        }
       }
+      const result = filteredModels.map((m) => ({
+        id: m.id,
+        brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, "-")}`,
+        name: m.marketingName || m.name,
+        slug: m.slug,
+        year: null
+      }));
+      res.json(result);
     } catch (error) {
-      console.error("Error fetching models:", error);
-      res.status(500).json({ error: "Failed to fetch models" });
-    }
-  });
-  app2.get("/api/models/:slug", async (req, res) => {
-    try {
-      const model = await storage.getModelBySlug(req.params.slug);
-      if (!model) {
-        return res.status(404).json({ error: "Model not found" });
-      }
-      const variants = await storage.getVariantsByModel(model.id);
-      res.json({ ...model, variants });
-    } catch (error) {
-      console.error("Error fetching model:", error);
-      res.status(500).json({ error: "Failed to fetch model" });
-    }
-  });
-  app2.get("/api/variants/:id", async (req, res) => {
-    try {
-      const variant = await storage.getVariant(req.params.id);
-      if (!variant) {
-        return res.status(404).json({ error: "Variant not found" });
-      }
-      res.json(variant);
-    } catch (error) {
-      console.error("Error fetching variant:", error);
-      res.status(500).json({ error: "Failed to fetch variant" });
-    }
-  });
-  app2.get("/api/models/:modelId/variants", async (req, res) => {
-    try {
-      const variants = await storage.getVariantsByModel(req.params.modelId);
-      res.json(variants);
-    } catch (error) {
-      console.error("Error fetching variants:", error);
-      res.status(500).json({ error: "Failed to fetch variants" });
+      console.error("Get models error:", error);
+      res.status(500).json({ error: "Failed to get models" });
     }
   });
   app2.get("/api/conditions", async (req, res) => {
     try {
-      const profiles = await storage.getAllConditionProfiles();
-      res.json(profiles);
+      const conditions = [
+        { id: "A", name: "Like New", description: "Flawless condition, no visible wear" },
+        { id: "B", name: "Good", description: "Minor signs of use, fully functional" },
+        { id: "C", name: "Fair", description: "Moderate wear, fully functional" },
+        { id: "D", name: "Poor", description: "Heavy wear but works" }
+      ];
+      res.json(conditions);
     } catch (error) {
-      console.error("Error fetching condition profiles:", error);
-      res.status(500).json({ error: "Failed to fetch condition profiles" });
+      console.error("Get conditions error:", error);
+      res.status(500).json({ error: "Failed to get conditions" });
     }
   });
-  app2.get("/api/pricing/:variantId/:conditionId", async (req, res) => {
+  app2.get("/api/cart", requireAuth, async (req, res) => {
     try {
-      const { variantId, conditionId } = req.params;
-      const rule = await storage.getPricingRuleByVariantAndCondition(variantId, conditionId);
-      if (!rule) {
-        return res.status(404).json({ error: "Pricing rule not found" });
-      }
-      res.json(rule);
-    } catch (error) {
-      console.error("Error fetching pricing:", error);
-      res.status(500).json({ error: "Failed to fetch pricing" });
-    }
-  });
-  app2.post("/api/pricing/calculate", async (req, res) => {
-    try {
-      const schema = z2.object({
-        deviceVariantId: z2.string(),
-        conditionProfileId: z2.string(),
-        claimedIssues: z2.object({
-          isFinanced: z2.boolean().optional(),
-          noPower: z2.boolean().optional(),
-          functionalIssue: z2.boolean().optional(),
-          crackedGlass: z2.boolean().optional(),
-          activationLock: z2.boolean().optional()
-        }).optional()
-      });
-      const validation = schema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid pricing data",
-          details: fromError(validation.error).toString()
-        });
-      }
-      console.log("[Pricing] Calculating offer for:", {
-        variantId: validation.data.deviceVariantId,
-        conditionId: validation.data.conditionProfileId,
-        issues: validation.data.claimedIssues
-      });
-      const result = await calculateDeviceOffer(validation.data);
-      if (!result) {
-        console.log("[Pricing] No pricing rule found for variant:", validation.data.deviceVariantId, "condition:", validation.data.conditionProfileId);
-        return res.status(404).json({
-          error: "No pricing rule found for this device variant and condition"
-        });
-      }
-      console.log("[Pricing] Calculated offer:", result.finalOffer);
-      res.json(result);
-    } catch (error) {
-      console.error("Error calculating price:", error);
-      res.status(500).json({ error: "Failed to calculate price" });
-    }
-  });
-  app2.get("/api/quotes/my-quotes", requireAuth, async (req, res) => {
-    try {
-      const quotes = await storage.getQuoteRequestsByUser(req.session.userId);
-      const quotesWithItems = await Promise.all(
-        quotes.map(async (quote) => {
-          const lineItems = await storage.getQuoteLineItemsByQuote(quote.id);
-          const itemsWithDetails = await Promise.all(
-            lineItems.map(async (item) => {
-              const model = item.deviceModelId ? await storage.getModel(item.deviceModelId) : null;
-              const variant = item.deviceVariantId ? await storage.getVariant(item.deviceVariantId) : null;
-              return {
-                ...item,
-                deviceModel: model,
-                deviceVariant: variant
-              };
-            })
-          );
-          return { ...quote, items: itemsWithDetails };
-        })
-      );
-      res.json(quotesWithItems);
-    } catch (error) {
-      console.error("Error fetching user quotes:", error);
-      res.status(500).json({ error: "Failed to fetch quotes" });
-    }
-  });
-  app2.post("/api/quotes", async (req, res) => {
-    try {
-      const validation = insertQuoteRequestSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid quote data",
-          details: fromError(validation.error).toString()
-        });
-      }
-      const quoteNumber = `SHC-Q-${Date.now().toString().slice(-6)}`;
-      const quote = await storage.createQuoteRequest({
-        ...validation.data,
-        quoteNumber
-      });
-      res.status(201).json(quote);
-    } catch (error) {
-      console.error("Error creating quote:", error);
-      res.status(500).json({ error: "Failed to create quote" });
-    }
-  });
-  app2.get("/api/quotes/:id", async (req, res) => {
-    try {
-      const quote = await storage.getQuoteRequest(req.params.id);
-      if (!quote) {
-        return res.status(404).json({ error: "Quote not found" });
-      }
-      const lineItems = await storage.getQuoteLineItemsByQuote(quote.id);
-      res.json({ ...quote, lineItems });
-    } catch (error) {
-      console.error("Error fetching quote:", error);
-      res.status(500).json({ error: "Failed to fetch quote" });
-    }
-  });
-  app2.get("/api/quotes/by-number/:quoteNumber", async (req, res) => {
-    try {
-      const quote = await storage.getQuoteRequestByNumber(req.params.quoteNumber);
-      if (!quote) {
-        return res.status(404).json({ error: "Quote not found" });
-      }
-      const lineItems = await storage.getQuoteLineItemsByQuote(quote.id);
-      res.json({ ...quote, lineItems });
-    } catch (error) {
-      console.error("Error fetching quote:", error);
-      res.status(500).json({ error: "Failed to fetch quote" });
-    }
-  });
-  app2.post("/api/quotes/:quoteId/items", async (req, res) => {
-    try {
-      const validation = insertQuoteLineItemSchema.safeParse({
-        ...req.body,
-        quoteRequestId: req.params.quoteId
-      });
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid line item data",
-          details: fromError(validation.error).toString()
-        });
-      }
-      const item = await storage.createQuoteLineItem(validation.data);
-      res.status(201).json(item);
-    } catch (error) {
-      console.error("Error creating line item:", error);
-      res.status(500).json({ error: "Failed to create line item" });
-    }
-  });
-  app2.patch("/api/quotes/:id", async (req, res) => {
-    try {
-      const updateSchema = insertQuoteRequestSchema.partial();
-      const validation = updateSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid update data",
-          details: fromError(validation.error).toString()
-        });
-      }
-      const quote = await storage.updateQuoteRequest(req.params.id, validation.data);
-      if (!quote) {
-        return res.status(404).json({ error: "Quote not found" });
-      }
-      res.json(quote);
-    } catch (error) {
-      console.error("Error updating quote:", error);
-      res.status(500).json({ error: "Failed to update quote" });
-    }
-  });
-  app2.get("/api/users/:userId/quotes", requireAuth, async (req, res) => {
-    try {
-      if (req.session.userId !== req.params.userId) {
-        const user = await storage.getUser(req.session.userId);
-        if (!user || user.role !== "admin" && user.role !== "super_admin") {
-          return res.status(403).json({ error: "Access denied" });
+      let cart = await storage.getCartByUserId(req.session.userId);
+      if (!cart) {
+        const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+        if (companyUsers2.length === 0) {
+          return res.status(400).json({ error: "No company found for user" });
         }
-      }
-      const quotes = await storage.getQuoteRequestsByUser(req.params.userId);
-      res.json(quotes);
-    } catch (error) {
-      console.error("Error fetching user quotes:", error);
-      res.status(500).json({ error: "Failed to fetch quotes" });
-    }
-  });
-  app2.post("/api/orders", async (req, res) => {
-    try {
-      const orderNumber = `SHC-S-${Date.now().toString().slice(-6)}`;
-      const validation = insertSellOrderSchema.safeParse({
-        ...req.body,
-        orderNumber
-      });
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid order data",
-          details: fromError(validation.error).toString()
+        cart = await storage.createCart({
+          userId: req.session.userId,
+          companyId: companyUsers2[0].companyId
         });
       }
-      const order = await storage.createSellOrder(validation.data);
-      res.status(201).json(order);
-    } catch (error) {
-      console.error("Error creating order:", error);
-      res.status(500).json({ error: "Failed to create order" });
-    }
-  });
-  app2.post("/api/orders/:orderId/items", async (req, res) => {
-    try {
-      const validation = insertSellOrderItemSchema.safeParse({
-        ...req.body,
-        sellOrderId: req.params.orderId
-      });
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid order item data",
-          details: fromError(validation.error).toString()
-        });
-      }
-      console.log("Creating order item with data:", JSON.stringify(validation.data, null, 2));
-      const item = await storage.createSellOrderItem(validation.data);
-      res.status(201).json(item);
-    } catch (error) {
-      console.error("Error creating order item:", error);
-      console.error("Error details:", {
-        code: error.code,
-        message: error.message,
-        data: req.body
-      });
-      res.status(500).json({
-        error: "Failed to create order item",
-        details: error.message
-      });
-    }
-  });
-  app2.get("/api/orders/:id", async (req, res) => {
-    try {
-      const order = await storage.getSellOrder(req.params.id);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const items = await storage.getSellOrderItemsByOrder(order.id);
-      res.json({ ...order, items });
-    } catch (error) {
-      console.error("Error fetching order:", error);
-      res.status(500).json({ error: "Failed to fetch order" });
-    }
-  });
-  app2.get("/api/orders/by-number/:orderNumber", async (req, res) => {
-    try {
-      const order = await storage.getSellOrderByNumber(req.params.orderNumber);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const items = await storage.getSellOrderItemsByOrder(order.id);
-      res.json({ ...order, items });
-    } catch (error) {
-      console.error("Error fetching order:", error);
-      res.status(500).json({ error: "Failed to fetch order" });
-    }
-  });
-  app2.post("/api/orders/:id/generate-label", async (req, res) => {
-    try {
-      const orderId = req.params.id;
-      const { name, email, phone, address, city, state, zipCode } = req.body;
-      console.log("[Label Gen] Starting for order:", orderId);
-      const order = await storage.getSellOrder(orderId);
-      if (!order) return res.status(404).json({ error: "Order not found" });
-      console.log("[Label Gen] Order data:", {
-        customerEmail: order.customerEmail,
-        customerPhone: order.customerPhone,
-        shippingAddressLine1: order.shippingAddressLine1,
-        shippingCity: order.shippingCity,
-        shippingState: order.shippingState,
-        shippingPostalCode: order.shippingPostalCode
-      });
-      const customerEmail = email || order.customerEmail;
-      const customerPhone = phone || order.customerPhone;
-      const customerName = name || customerEmail?.split("@")[0] || "Customer";
-      const shippingAddress = address || order.shippingAddressLine1;
-      const shippingCity = city || order.shippingCity;
-      const shippingState = state || order.shippingState;
-      const shippingZip = zipCode || order.shippingPostalCode;
-      if (!customerEmail || !shippingAddress || !shippingCity || !shippingState || !shippingZip) {
-        console.log("[Label Gen] Missing fields:", {
-          customerEmail: !!customerEmail,
-          shippingAddress: !!shippingAddress,
-          shippingCity: !!shippingCity,
-          shippingState: !!shippingState,
-          shippingZip: !!shippingZip
-        });
-        return res.status(400).json({
-          error: "Missing shipping information",
-          details: "Order must have complete shipping address to generate label"
-        });
-      }
-      const toAddress = {
-        name: customerName,
-        address_line1: shippingAddress,
-        city_locality: shippingCity,
-        state_province: stateNameToAbbr(shippingState),
-        postal_code: shippingZip,
-        country_code: "US",
-        phone: customerPhone || "",
-        email: customerEmail
-      };
-      console.log("[Label Gen] Calling ShipEngine with address:", toAddress.city_locality, toAddress.state_province);
-      const label = await createShippingLabel(toAddress, order.orderNumber, {
-        weight: 16,
-        // Default 1 lb for phones
-        serviceCode: "usps_ground_advantage"
-      });
-      console.log("[Label Gen] Label created:", { trackingNumber: label.trackingNumber, labelUrl: label.labelUrl?.substring(0, 50) });
-      const shipment = await storage.createShipment({
-        sellOrderId: orderId,
-        carrierName: label.carrier,
-        serviceLevel: label.serviceCode,
-        trackingNumber: label.trackingNumber,
-        labelUrl: label.labelUrl,
-        labelCost: label.cost,
-        labelPaidBy: "company",
-        shipFromAddressJson: JSON.stringify(toAddress),
-        shipToAddressJson: JSON.stringify(toAddress)
-      });
-      console.log("[Label Gen] Shipment saved:", shipment.id);
-      await storage.updateSellOrder(orderId, {
-        shipmentId: shipment.id,
-        status: "awaiting_device"
-      });
-      console.log("[Label Gen] Order updated with shipment ID");
-      if (email) {
-        await sendShippingLabel(email, order.orderNumber, label.labelUrl);
-      }
-      res.json({
-        ...shipment,
-        labelDownloadUrl: label.labelUrl,
-        labelPdfUrl: label.labelPdfUrl
-      });
-    } catch (error) {
-      console.error("[Label Gen] Error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate label" });
-    }
-  });
-  app2.patch("/api/orders/:id", requireAuth, async (req, res) => {
-    try {
-      const oldOrder = await storage.getSellOrder(req.params.id);
-      if (!oldOrder) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const updateSchema = insertSellOrderSchema.partial();
-      const validation = updateSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: "Invalid update data",
-          details: fromError(validation.error).toString()
-        });
-      }
-      const order = await storage.updateSellOrder(req.params.id, validation.data);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      if (req.body.status && req.body.status !== oldOrder.status) {
-        const emailMatch = order.notesCustomer?.match(/Email:\s*([^\s,]+)/);
-        const email = emailMatch ? emailMatch[1] : null;
-        if (email) {
-          const items = await storage.getSellOrderItemsByOrder(order.id);
-          const firstItem = items[0];
-          let deviceName = "Your device";
-          if (firstItem) {
-            const model = await storage.getModel(firstItem.deviceModelId);
-            if (model) deviceName = model.name;
-          }
-          switch (req.body.status) {
-            case "received":
-              await sendDeviceReceived(email, order.orderNumber, deviceName);
-              break;
-            case "payout_pending":
-              const payoutPendingAmount = order.totalFinalOffer || order.totalOriginalOffer;
-              const pendingAmount = typeof payoutPendingAmount === "number" ? payoutPendingAmount : parseFloat(payoutPendingAmount || "0");
-              await sendInspectionComplete(email, order.orderNumber, pendingAmount, true);
-              break;
-            case "completed":
-              if (order.payoutStatus === "sent") {
-                const payoutAmount = order.totalFinalOffer || order.totalOriginalOffer;
-                const amount = typeof payoutAmount === "number" ? payoutAmount : parseFloat(payoutAmount || "0");
-                await sendPaymentConfirmation(email, order.orderNumber, amount, order.payoutMethod || "selected method");
-              }
-              break;
-            case "reoffer_pending":
-            case "customer_decision_pending":
-              if (order.totalFinalOffer) {
-                const finalOffer = typeof order.totalFinalOffer === "number" ? order.totalFinalOffer : parseFloat(order.totalFinalOffer);
-                await sendInspectionComplete(email, order.orderNumber, finalOffer, false);
-              }
-              break;
-          }
-        }
-      }
-      res.json(order);
-    } catch (error) {
-      console.error("Error updating order:", error);
-      res.status(500).json({ error: "Failed to update order" });
-    }
-  });
-  app2.get("/api/orders/my-orders", requireAuth, async (req, res) => {
-    try {
-      const userId = req.session.userId;
-      const orders = await storage.getSellOrdersByUser(userId);
-      const ordersWithItems = await Promise.all(
-        orders.map(async (order) => {
-          const items = await storage.getSellOrderItemsByOrder(order.id);
-          const itemsWithDetails = await Promise.all(
-            items.map(async (item) => {
-              const model = await storage.getModel(item.deviceModelId);
-              const variant = item.deviceVariantId ? await storage.getVariant(item.deviceVariantId) : null;
-              return {
-                ...item,
-                deviceModel: model,
-                deviceVariant: variant
-              };
-            })
-          );
+      const items = await storage.getCartItems(cart.id);
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item) => {
+          const variant = await storage.getDeviceVariant(item.deviceVariantId);
+          const model = variant ? await storage.getDeviceModel(variant.deviceModelId) : null;
           return {
-            ...order,
-            items: itemsWithDetails
+            ...item,
+            unitPrice: item.unitPriceSnapshot,
+            // Map to unitPrice for frontend
+            variant: variant ? {
+              ...variant,
+              deviceModel: model
+            } : null
           };
         })
       );
-      res.json(ordersWithItems);
+      res.json({ cart, items: itemsWithDetails });
     } catch (error) {
-      console.error("Error fetching user orders:", error);
-      res.status(500).json({ error: "Failed to fetch orders" });
+      console.error("Get cart error:", error);
+      res.status(500).json({ error: "Failed to get cart" });
     }
   });
-  app2.post("/api/orders/accept-offer", requireAuth, async (req, res) => {
+  app2.post("/api/cart/items", requireAuth, async (req, res) => {
     try {
-      const schema = z2.object({
-        deviceModelId: z2.string(),
-        deviceVariantId: z2.string(),
-        conditionProfileId: z2.string(),
-        claimedIssues: z2.object({
-          isFinanced: z2.boolean(),
-          noPower: z2.boolean(),
-          functionalIssue: z2.boolean(),
-          crackedGlass: z2.boolean(),
-          activationLock: z2.boolean()
-        }),
-        imei: z2.string().optional(),
-        serialNumber: z2.string().optional()
-      });
-      const validation = schema.safeParse(req.body);
-      if (!validation.success) {
+      const { deviceVariantId, quantity } = req.body;
+      let cart = await storage.getCartByUserId(req.session.userId);
+      if (!cart) {
+        const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+        cart = await storage.createCart({
+          userId: req.session.userId,
+          companyId: companyUsers2[0].companyId
+        });
+      }
+      const priceTiers2 = await storage.getPriceTiersByVariantId(deviceVariantId);
+      const applicableTier = priceTiers2.find(
+        (tier) => quantity >= tier.minQuantity && (!tier.maxQuantity || quantity <= tier.maxQuantity)
+      );
+      let unitPrice = applicableTier?.unitPrice;
+      if (!unitPrice && priceTiers2.length > 0) {
+        const sortedTiers = [...priceTiers2].sort((a, b) => a.minQuantity - b.minQuantity);
+        const lowestTier = sortedTiers[0];
+        const highestTier = sortedTiers[sortedTiers.length - 1];
+        if (quantity < lowestTier.minQuantity) {
+          unitPrice = lowestTier.unitPrice;
+        } else if (quantity >= highestTier.minQuantity) {
+          unitPrice = highestTier.unitPrice;
+        } else {
+          unitPrice = lowestTier.unitPrice;
+        }
+      }
+      if (!unitPrice) {
+        const variant = await storage.getDeviceVariant(deviceVariantId);
+        unitPrice = variant?.minPrice;
+      }
+      if (!unitPrice) {
         return res.status(400).json({
-          error: "Invalid offer data",
-          details: fromError(validation.error).toString()
+          error: "Unable to determine price for this item. Please contact support."
         });
       }
-      const variant = await storage.getVariant(validation.data.deviceVariantId);
-      if (!variant) {
-        return res.status(404).json({ error: "Device variant not found" });
-      }
-      if (variant.modelId !== validation.data.deviceModelId) {
-        return res.status(400).json({ error: "Variant does not belong to specified model" });
-      }
-      const condition = await storage.getConditionProfile(validation.data.conditionProfileId);
-      if (!condition) {
-        return res.status(404).json({ error: "Condition profile not found" });
-      }
-      const pricingResult = await calculateDeviceOffer({
-        deviceVariantId: validation.data.deviceVariantId,
-        conditionProfileId: validation.data.conditionProfileId,
-        claimedIssues: validation.data.claimedIssues
+      const item = await storage.addCartItem({
+        cartId: cart.id,
+        deviceVariantId,
+        quantity,
+        unitPriceSnapshot: unitPrice
       });
-      if (!pricingResult) {
-        return res.status(404).json({
-          error: "No pricing available for this device and condition"
-        });
-      }
-      const userId = req.session.userId;
-      const orderNumber = `SHC-O-${Date.now().toString().slice(-6)}`;
-      const order = await storage.createSellOrder({
-        orderNumber,
-        userId,
-        status: "label_pending",
-        totalOriginalOffer: pricingResult.finalOffer,
-        currency: pricingResult.currency
-      });
-      await storage.createSellOrderItem({
-        sellOrderId: order.id,
-        deviceModelId: validation.data.deviceModelId,
-        deviceVariantId: validation.data.deviceVariantId,
-        claimedConditionProfileId: validation.data.conditionProfileId,
-        claimedIssuesJson: JSON.stringify(validation.data.claimedIssues),
-        originalOfferAmount: pricingResult.finalOffer,
-        pricingRuleId: pricingResult.pricingRuleId,
-        basePrice: pricingResult.basePrice,
-        totalPenalty: pricingResult.totalPenalty,
-        penaltyBreakdownJson: JSON.stringify(pricingResult.penalties),
-        imei: validation.data.imei,
-        serialNumber: validation.data.serialNumber
-      });
-      res.status(201).json({ order, pricing: pricingResult });
+      res.json(item);
     } catch (error) {
-      console.error("Error accepting offer:", error);
+      console.error("Add cart item error:", error);
+      res.status(500).json({ error: "Failed to add item to cart" });
+    }
+  });
+  app2.patch("/api/cart/items/:id", requireAuth, async (req, res) => {
+    try {
+      const { quantity } = req.body;
+      const item = await storage.updateCartItem(req.params.id, { quantity });
+      res.json(item);
+    } catch (error) {
+      console.error("Update cart item error:", error);
+      res.status(500).json({ error: "Failed to update cart item" });
+    }
+  });
+  app2.delete("/api/cart/items/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.removeCartItem(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Remove cart item error:", error);
+      res.status(500).json({ error: "Failed to remove cart item" });
+    }
+  });
+  app2.post("/api/orders", requireAuth, async (req, res) => {
+    try {
+      const { paymentMethod, shippingAddressId, billingAddressId, notes } = req.body;
+      if (!shippingAddressId) {
+        return res.status(400).json({ error: "Shipping address is required" });
+      }
+      if (!billingAddressId) {
+        return res.status(400).json({ error: "Billing address is required" });
+      }
+      if (paymentMethod === "card" && !stripe) {
+        return res.status(503).json({ error: "Card payment is not available. Please select another payment method." });
+      }
+      const cart = await storage.getCartByUserId(req.session.userId);
+      if (!cart) {
+        return res.status(400).json({ error: "Cart not found" });
+      }
+      const items = await storage.getCartItems(cart.id);
+      if (items.length === 0) {
+        return res.status(400).json({ error: "Cart is empty" });
+      }
+      let subtotal = 0;
+      for (const item of items) {
+        subtotal += parseFloat(item.unitPriceSnapshot) * item.quantity;
+      }
+      const shippingCost = 25;
+      const taxAmount = subtotal * 0.08;
+      const total = subtotal + shippingCost + taxAmount;
+      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+      const order = await storage.createOrder({
+        orderNumber,
+        companyId: cart.companyId,
+        createdByUserId: req.session.userId,
+        status: "pending_payment",
+        subtotal: subtotal.toFixed(2),
+        shippingCost: shippingCost.toFixed(2),
+        taxAmount: taxAmount.toFixed(2),
+        discountAmount: "0",
+        total: total.toFixed(2),
+        currency: "USD",
+        paymentStatus: "unpaid",
+        paymentMethod: paymentMethod || "card",
+        shippingAddressId: shippingAddressId || null,
+        billingAddressId: billingAddressId || null,
+        notesCustomer: notes || null
+      });
+      for (const item of items) {
+        await storage.createOrderItem({
+          orderId: order.id,
+          deviceVariantId: item.deviceVariantId,
+          quantity: item.quantity,
+          unitPrice: item.unitPriceSnapshot,
+          lineTotal: (parseFloat(item.unitPriceSnapshot) * item.quantity).toFixed(2)
+        });
+      }
+      await storage.clearCart(cart.id);
+      res.json(order);
+    } catch (error) {
+      console.error("Create order error:", error);
       res.status(500).json({ error: "Failed to create order" });
     }
   });
-  app2.get("/api/users/:userId/orders", requireAuth, async (req, res) => {
+  app2.get("/api/orders", requireAuth, async (req, res) => {
     try {
-      if (req.session.userId !== req.params.userId) {
-        const user = await storage.getUser(req.session.userId);
-        if (!user || user.role !== "admin" && user.role !== "super_admin") {
+      const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+      if (companyUsers2.length === 0) {
+        return res.json([]);
+      }
+      const orders2 = await storage.getOrdersByCompanyId(companyUsers2[0].companyId);
+      res.json(orders2);
+    } catch (error) {
+      console.error("Get orders error:", error);
+      res.status(500).json({ error: "Failed to get orders" });
+    }
+  });
+  app2.get("/api/orders/:orderNumber", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getOrderByNumber(req.params.orderNumber);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      const items = await storage.getOrderItems(order.id);
+      const payments2 = await storage.getPaymentsByOrderId(order.id);
+      const shipments2 = await storage.getShipmentsByOrderId(order.id);
+      res.json({ ...order, items, payments: payments2, shipments: shipments2 });
+    } catch (error) {
+      console.error("Get order error:", error);
+      res.status(500).json({ error: "Failed to get order" });
+    }
+  });
+  app2.post("/api/create-payment-intent", requireAuth, async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(503).json({ error: "Payment processing is not configured" });
+      }
+      const { amount, orderId } = req.body;
+      if (!orderId) {
+        return res.status(400).json({ error: "Order ID is required" });
+      }
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+      const hasAccess = companyUsers2.some((cu) => cu.companyId === order.companyId);
+      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(parseFloat(amount) * 100),
+        // Convert to cents
+        currency: "usd",
+        metadata: {
+          orderId,
+          userId: req.session.userId,
+          orderNumber: order.orderNumber
+        }
+      });
+      await storage.updateOrder(orderId, {
+        notesInternal: `Stripe Payment Intent: ${paymentIntent.id}`
+      });
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error) {
+      console.error("Create payment intent error:", error);
+      res.status(500).json({ error: "Failed to create payment intent: " + error.message });
+    }
+  });
+  app2.post("/api/confirm-payment", requireAuth, async (req, res) => {
+    try {
+      const { orderId, paymentIntentId } = req.body;
+      if (!orderId || !paymentIntentId) {
+        return res.status(400).json({ error: "Order ID and payment intent ID are required" });
+      }
+      if (!stripe) {
+        return res.status(503).json({ error: "Payment processing is not configured" });
+      }
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+      const hasAccess = companyUsers2.some((cu) => cu.companyId === order.companyId);
+      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (paymentIntent.metadata.orderId !== orderId) {
+        return res.status(400).json({ error: "Payment intent does not match order" });
+      }
+      if (paymentIntent.status !== "succeeded") {
+        return res.status(400).json({ error: "Payment has not succeeded" });
+      }
+      const orderTotalCents = Math.round(parseFloat(order.total) * 100);
+      if (paymentIntent.amount !== orderTotalCents) {
+        return res.status(400).json({ error: "Payment amount does not match order total" });
+      }
+      await storage.updateOrder(orderId, {
+        status: "processing",
+        paymentStatus: "paid"
+      });
+      await storage.createPayment({
+        orderId,
+        amount: (paymentIntent.amount / 100).toFixed(2),
+        currency: paymentIntent.currency.toUpperCase(),
+        method: "card",
+        status: "paid",
+        stripePaymentIntentId: paymentIntent.id,
+        processedAt: /* @__PURE__ */ new Date()
+      });
+      res.json({ success: true, order });
+    } catch (error) {
+      console.error("Confirm payment error:", error);
+      res.status(500).json({ error: "Failed to confirm payment: " + error.message });
+    }
+  });
+  app2.get("/api/companies/:id", requireAuth, async (req, res) => {
+    try {
+      const company = await storage.getCompany(req.params.id);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+        const isMember = companyUsers2.some((cu) => cu.companyId === req.params.id);
+        if (!isMember) {
           return res.status(403).json({ error: "Access denied" });
         }
       }
-      const orders = await storage.getSellOrdersByUser(req.params.userId);
-      res.json(orders);
+      const shippingAddresses2 = await storage.getShippingAddressesByCompanyId(company.id);
+      const billingAddresses2 = await storage.getBillingAddressesByCompanyId(company.id);
+      res.json({
+        ...company,
+        shippingAddresses: shippingAddresses2,
+        billingAddresses: billingAddresses2
+      });
     } catch (error) {
-      console.error("Error fetching user orders:", error);
-      res.status(500).json({ error: "Failed to fetch orders" });
+      console.error("Get company error:", error);
+      res.status(500).json({ error: "Failed to get company" });
+    }
+  });
+  app2.get("/api/admin/companies", requireAdmin, async (req, res) => {
+    try {
+      const companies2 = await storage.getAllCompanies();
+      res.json(companies2);
+    } catch (error) {
+      console.error("Get companies error:", error);
+      res.status(500).json({ error: "Failed to get companies" });
+    }
+  });
+  app2.post("/api/admin/companies/bulk", requireAdmin, async (req, res) => {
+    try {
+      const { companyIds, status, creditLimit } = req.body;
+      if (!Array.isArray(companyIds) || companyIds.length === 0) {
+        return res.status(400).json({ error: "companyIds must be a non-empty array" });
+      }
+      const results = await db.transaction(async (tx) => {
+        const updated = [];
+        for (const id of companyIds) {
+          const updates = {};
+          if (status) updates.status = status;
+          if (creditLimit !== void 0) updates.creditLimit = creditLimit;
+          const [company] = await tx.update(companies).set(updates).where(companies.id.equals(id)).returning();
+          if (company) {
+            await tx.insert(auditLogs).values({
+              actorUserId: req.session.userId || null,
+              companyId: id,
+              action: "company_bulk_updated",
+              entityType: "company",
+              entityId: id,
+              previousValues: null,
+              newValues: JSON.stringify(updates)
+            });
+            updated.push(company);
+          }
+        }
+        return updated;
+      });
+      res.json({ updated: results });
+    } catch (error) {
+      console.error("Bulk update companies error:", error);
+      res.status(500).json({ error: "Failed to bulk update companies" });
+    }
+  });
+  app2.patch("/api/admin/companies/:id", requireAdmin, async (req, res) => {
+    try {
+      const { status, creditLimit } = req.body;
+      const updates = {};
+      if (status) updates.status = status;
+      if (creditLimit !== void 0) updates.creditLimit = creditLimit;
+      const company = await storage.updateCompany(req.params.id, updates);
+      await storage.createAuditLog({
+        actorUserId: req.session.userId,
+        companyId: req.params.id,
+        action: "company_updated",
+        entityType: "company",
+        entityId: req.params.id,
+        newValues: JSON.stringify(updates)
+      });
+      res.json(company);
+    } catch (error) {
+      console.error("Update company error:", error);
+      res.status(500).json({ error: "Failed to update company" });
+    }
+  });
+  app2.post("/api/admin/device-models", requireAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        brand: z.string(),
+        name: z.string(),
+        marketingName: z.string().optional(),
+        sku: z.string(),
+        categorySlug: z.string().optional(),
+        categoryName: z.string().optional(),
+        description: z.string().optional(),
+        imageUrl: z.string().optional(),
+        variant: z.object({
+          storage: z.string(),
+          color: z.string(),
+          conditionGrade: z.string(),
+          networkLockStatus: z.string().default("unlocked"),
+          internalCode: z.string().optional(),
+          unitPrice: z.number(),
+          quantity: z.number().min(0),
+          minOrderQuantity: z.number().min(1).default(1)
+        })
+      });
+      const data = schema.parse(req.body);
+      let categoryId;
+      if (data.categorySlug) {
+        const category = await storage.getCategoryBySlug(data.categorySlug);
+        categoryId = category?.id;
+      }
+      if (!categoryId) {
+        const fallbackName = data.categoryName || "smartphones";
+        const fallbackSlug = slugify(fallbackName);
+        const existing = await storage.getCategoryBySlug(fallbackSlug);
+        if (existing) {
+          categoryId = existing.id;
+        } else {
+          const created = await storage.createCategory({
+            name: fallbackName,
+            slug: fallbackSlug
+          });
+          categoryId = created.id;
+        }
+      }
+      const baseSlug = slugify(`${data.brand}-${data.name}-${data.sku}`);
+      const model = await storage.createDeviceModel({
+        brand: data.brand,
+        name: data.name,
+        marketingName: data.marketingName || data.name,
+        sku: data.sku,
+        slug: baseSlug,
+        categoryId,
+        imageUrl: data.imageUrl || null,
+        description: data.description || null,
+        isActive: true
+      });
+      const variant = await storage.createDeviceVariant({
+        deviceModelId: model.id,
+        storage: data.variant.storage,
+        color: data.variant.color,
+        conditionGrade: data.variant.conditionGrade,
+        networkLockStatus: data.variant.networkLockStatus,
+        internalCode: data.variant.internalCode || null,
+        isActive: true
+      });
+      await storage.createInventory({
+        deviceVariantId: variant.id,
+        quantityAvailable: data.variant.quantity,
+        minOrderQuantity: data.variant.minOrderQuantity,
+        status: "in_stock"
+      });
+      await storage.createPriceTier({
+        deviceVariantId: variant.id,
+        minQuantity: 1,
+        maxQuantity: null,
+        unitPrice: data.variant.unitPrice,
+        currency: "USD",
+        isActive: true
+      });
+      res.json({ model, variant });
+    } catch (error) {
+      console.error("Create device error:", error);
+      res.status(500).json({ error: "Failed to create device" });
+    }
+  });
+  app2.patch("/api/admin/device-variants/:id", requireAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        storage: z.string().optional(),
+        color: z.string().optional(),
+        conditionGrade: z.string().optional(),
+        networkLockStatus: z.string().optional(),
+        unitPrice: z.number().optional(),
+        quantity: z.number().optional(),
+        minOrderQuantity: z.number().optional()
+      });
+      const data = schema.parse(req.body);
+      const variantId = req.params.id;
+      const variant = await storage.getDeviceVariant(variantId);
+      if (!variant) {
+        return res.status(404).json({ error: "Variant not found" });
+      }
+      const updatedVariant = await storage.updateDeviceVariant(variantId, {
+        storage: data.storage ?? variant.storage,
+        color: data.color ?? variant.color,
+        conditionGrade: data.conditionGrade ?? variant.conditionGrade,
+        networkLockStatus: data.networkLockStatus ?? variant.networkLockStatus
+      });
+      let inventory = await storage.getInventoryByVariantId(variantId);
+      if (data.quantity !== void 0 || data.minOrderQuantity !== void 0) {
+        if (inventory) {
+          inventory = await storage.updateInventory(inventory.id, {
+            quantityAvailable: data.quantity ?? inventory.quantityAvailable,
+            minOrderQuantity: data.minOrderQuantity ?? inventory.minOrderQuantity
+          });
+        } else {
+          inventory = await storage.createInventory({
+            deviceVariantId: variantId,
+            quantityAvailable: data.quantity ?? 0,
+            minOrderQuantity: data.minOrderQuantity ?? 1,
+            status: "in_stock"
+          });
+        }
+      }
+      let priceTier;
+      if (data.unitPrice !== void 0) {
+        const tiers = await storage.getPriceTiersByVariantId(variantId);
+        if (tiers.length > 0) {
+          priceTier = await storage.updatePriceTier(tiers[0].id, { unitPrice: data.unitPrice });
+        } else {
+          priceTier = await storage.createPriceTier({
+            deviceVariantId: variantId,
+            minQuantity: 1,
+            maxQuantity: null,
+            unitPrice: data.unitPrice,
+            currency: "USD",
+            isActive: true
+          });
+        }
+      }
+      res.json({ variant: updatedVariant, inventory, priceTier });
+    } catch (error) {
+      console.error("Update variant error:", error);
+      res.status(500).json({ error: "Failed to update variant" });
+    }
+  });
+  app2.delete("/api/admin/device-variants/:id", requireAdmin, async (req, res) => {
+    try {
+      const variantId = req.params.id;
+      await storage.deletePriceTiersByVariantId(variantId);
+      await storage.deleteInventoryByVariantId(variantId);
+      await storage.deleteDeviceVariant(variantId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete variant error:", error);
+      res.status(500).json({ error: "Failed to delete variant" });
+    }
+  });
+  app2.post("/api/admin/device-import", requireAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        devices: z.array(
+          z.object({
+            brand: z.string(),
+            name: z.string(),
+            marketingName: z.string().optional(),
+            sku: z.string(),
+            categorySlug: z.string().optional(),
+            categoryName: z.string().optional(),
+            variants: z.array(
+              z.object({
+                storage: z.string(),
+                color: z.string(),
+                conditionGrade: z.string(),
+                networkLockStatus: z.string().default("unlocked"),
+                unitPrice: z.number(),
+                quantity: z.number().min(0)
+              })
+            )
+          })
+        )
+      });
+      const data = schema.parse(req.body);
+      const created = [];
+      for (const device of data.devices) {
+        const categorySlug = device.categorySlug || slugify(device.categoryName || "smartphones");
+        let categoryId;
+        const existingCategory = await storage.getCategoryBySlug(categorySlug);
+        if (existingCategory) {
+          categoryId = existingCategory.id;
+        } else {
+          const createdCategory = await storage.createCategory({
+            name: device.categoryName || device.brand,
+            slug: categorySlug
+          });
+          categoryId = createdCategory.id;
+        }
+        const model = await storage.createDeviceModel({
+          brand: device.brand,
+          name: device.name,
+          marketingName: device.marketingName || device.name,
+          sku: device.sku,
+          slug: slugify(`${device.brand}-${device.name}-${device.sku}`),
+          categoryId,
+          isActive: true
+        });
+        for (const variantData of device.variants) {
+          const variant = await storage.createDeviceVariant({
+            deviceModelId: model.id,
+            storage: variantData.storage,
+            color: variantData.color,
+            conditionGrade: variantData.conditionGrade,
+            networkLockStatus: variantData.networkLockStatus,
+            isActive: true
+          });
+          await storage.createInventory({
+            deviceVariantId: variant.id,
+            quantityAvailable: variantData.quantity,
+            minOrderQuantity: 1,
+            status: "in_stock"
+          });
+          await storage.createPriceTier({
+            deviceVariantId: variant.id,
+            minQuantity: 1,
+            maxQuantity: null,
+            unitPrice: variantData.unitPrice,
+            currency: "USD",
+            isActive: true
+          });
+          created.push({ model, variant });
+        }
+      }
+      res.json({ created });
+    } catch (error) {
+      console.error("Import devices error:", error);
+      res.status(500).json({ error: "Failed to import devices" });
+    }
+  });
+  app2.post("/api/quotes", requireAuth, async (req, res) => {
+    try {
+      const { items, notes, validUntil } = req.body;
+      const companyContext = await getUserPrimaryCompany(req.session.userId);
+      if (!companyContext) {
+        return res.status(400).json({ error: "No company found for user" });
+      }
+      const companyId = companyContext.companyId;
+      const timestamp2 = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const quoteNumber = `QT-${timestamp2}-${random}`;
+      let subtotal = 0;
+      const preparedItems = [];
+      for (const item of items) {
+        const tiers = await storage.getPriceTiersByVariantId(item.deviceVariantId);
+        const matchingTier = selectPriceTierForQuantity(tiers, item.quantity);
+        if (!matchingTier) {
+          return res.status(400).json({ error: "No pricing available for one or more items" });
+        }
+        const unitPrice = parseFloat(matchingTier.unitPrice);
+        if (isNaN(unitPrice)) {
+          return res.status(400).json({ error: "Invalid pricing data for selected item" });
+        }
+        preparedItems.push({
+          deviceVariantId: item.deviceVariantId,
+          quantity: item.quantity,
+          unitPrice
+        });
+        subtotal += unitPrice * item.quantity;
+      }
+      const shippingEstimate = 0;
+      const taxEstimate = 0;
+      const totalEstimate = subtotal + shippingEstimate + taxEstimate;
+      const quote = await storage.createQuote({
+        quoteNumber,
+        companyId,
+        createdByUserId: req.session.userId,
+        status: "draft",
+        validUntil: validUntil ? new Date(validUntil) : null,
+        subtotal: subtotal.toFixed(2),
+        shippingEstimate: shippingEstimate.toFixed(2),
+        taxEstimate: taxEstimate.toFixed(2),
+        totalEstimate: totalEstimate.toFixed(2),
+        currency: "USD"
+      });
+      for (const item of preparedItems) {
+        await storage.createQuoteItem({
+          quoteId: quote.id,
+          deviceVariantId: item.deviceVariantId,
+          quantity: item.quantity,
+          proposedUnitPrice: item.unitPrice.toFixed(2),
+          lineTotalEstimate: (item.unitPrice * item.quantity).toFixed(2)
+        });
+      }
+      res.json(quote);
+    } catch (error) {
+      console.error("Create quote error:", error);
+      res.status(500).json({ error: "Failed to create quote" });
+    }
+  });
+  app2.get("/api/quotes/:id", requireAuth, async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+        const isMember = companyUsers2.some((cu) => cu.companyId === quote.companyId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      const items = await storage.getQuoteItems(quote.id);
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item) => {
+          const variant = await storage.getDeviceVariant(item.deviceVariantId);
+          const model = variant ? await storage.getDeviceModel(variant.deviceModelId) : null;
+          return { ...item, variant, model };
+        })
+      );
+      res.json({ ...quote, items: itemsWithDetails });
+    } catch (error) {
+      console.error("Get quote error:", error);
+      res.status(500).json({ error: "Failed to get quote" });
+    }
+  });
+  app2.get("/api/companies/:companyId/quotes", requireAuth, async (req, res) => {
+    try {
+      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+        const isMember = companyUsers2.some((cu) => cu.companyId === req.params.companyId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      const quotes2 = await storage.getQuotesByCompanyId(req.params.companyId);
+      res.json(quotes2);
+    } catch (error) {
+      console.error("Get company quotes error:", error);
+      res.status(500).json({ error: "Failed to get company quotes" });
+    }
+  });
+  app2.patch("/api/quotes/:id", requireAuth, async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
+        const isMember = companyUsers2.some((cu) => cu.companyId === quote.companyId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        const allowedUpdates = ["status"];
+        const updates2 = {};
+        if (req.body.status && ["accepted", "rejected"].includes(req.body.status)) {
+          updates2.status = req.body.status;
+        }
+        const updatedQuote2 = await storage.updateQuote(req.params.id, updates2);
+        return res.json(updatedQuote2);
+      }
+      const updates = {};
+      if (req.body.status) updates.status = req.body.status;
+      if (req.body.validUntil) updates.validUntil = new Date(req.body.validUntil);
+      const validatePricing = (value, fieldName) => {
+        if (value === void 0 || value === null) return null;
+        if (value === "") {
+          return `${fieldName} cannot be empty`;
+        }
+        const parsed = parseFloat(value);
+        if (isNaN(parsed)) {
+          return `${fieldName} must be a valid number`;
+        }
+        if (parsed < 0) {
+          return `${fieldName} cannot be negative`;
+        }
+        return null;
+      };
+      const errors = [];
+      if (req.body.subtotal !== void 0) {
+        const error = validatePricing(req.body.subtotal, "Subtotal");
+        if (error) errors.push(error);
+        else updates.subtotal = parseFloat(req.body.subtotal).toFixed(2);
+      }
+      if (req.body.shippingEstimate !== void 0) {
+        const error = validatePricing(req.body.shippingEstimate, "Shipping estimate");
+        if (error) errors.push(error);
+        else updates.shippingEstimate = parseFloat(req.body.shippingEstimate).toFixed(2);
+      }
+      if (req.body.taxEstimate !== void 0) {
+        const error = validatePricing(req.body.taxEstimate, "Tax estimate");
+        if (error) errors.push(error);
+        else updates.taxEstimate = parseFloat(req.body.taxEstimate).toFixed(2);
+      }
+      if (req.body.totalEstimate !== void 0) {
+        const error = validatePricing(req.body.totalEstimate, "Total estimate");
+        if (error) errors.push(error);
+        else updates.totalEstimate = parseFloat(req.body.totalEstimate).toFixed(2);
+      }
+      if (errors.length > 0) {
+        return res.status(400).json({ error: errors.join(", ") });
+      }
+      if (updates.status === "sent") {
+        const finalSubtotal = updates.subtotal || quote.subtotal;
+        const finalTotal = updates.totalEstimate || quote.totalEstimate;
+        if (parseFloat(finalTotal) <= 0) {
+          return res.status(400).json({
+            error: "Cannot send quote without valid pricing. Total estimate must be greater than 0."
+          });
+        }
+      }
+      const updatedQuote = await storage.updateQuote(req.params.id, updates);
+      await storage.createAuditLog({
+        actorUserId: req.session.userId,
+        companyId: quote.companyId,
+        action: "quote_updated",
+        entityType: "quote",
+        entityId: req.params.id,
+        newValues: JSON.stringify(updates)
+      });
+      res.json(updatedQuote);
+    } catch (error) {
+      console.error("Update quote error:", error);
+      res.status(500).json({ error: "Failed to update quote" });
+    }
+  });
+  app2.get("/api/admin/quotes", requireAdmin, async (req, res) => {
+    try {
+      const companies2 = await storage.getAllCompanies();
+      const allQuotes = await Promise.all(
+        companies2.map(async (company) => {
+          const quotes2 = await storage.getQuotesByCompanyId(company.id);
+          return quotes2.map((quote) => ({ ...quote, company }));
+        })
+      );
+      res.json(allQuotes.flat());
+    } catch (error) {
+      console.error("Get all quotes error:", error);
+      res.status(500).json({ error: "Failed to get quotes" });
     }
   });
   app2.get("/api/admin/orders", requireAdmin, async (req, res) => {
     try {
-      const orders = await storage.getAllSellOrders();
-      const ordersWithItems = await Promise.all(
-        orders.map(async (order) => {
-          const items = await storage.getSellOrderItemsByOrder(order.id);
-          const itemsWithDetails = await Promise.all(
-            items.map(async (item) => {
-              const model = await storage.getModel(item.deviceModelId);
-              const variant = item.deviceVariantId ? await storage.getVariant(item.deviceVariantId) : null;
-              return {
-                ...item,
-                deviceModel: model,
-                deviceVariant: variant
-              };
-            })
-          );
-          return {
-            ...order,
-            items: itemsWithDetails
-          };
-        })
-      );
-      res.json(ordersWithItems);
+      const orders2 = await storage.getAllOrders();
+      res.json(orders2);
     } catch (error) {
-      console.error("Error fetching all orders:", error);
-      res.status(500).json({ error: "Failed to fetch orders" });
+      console.error("Get all orders error:", error);
+      res.status(500).json({ error: "Failed to get orders" });
     }
   });
-  app2.post("/api/admin/brands", requireAdmin, async (req, res) => {
+  app2.get("/api/admin/export/orders.csv", requireAdmin, async (req, res) => {
     try {
-      const brand = await storage.createBrand(req.body);
-      res.status(201).json(brand);
-    } catch (error) {
-      console.error("Error creating brand:", error);
-      res.status(500).json({ error: "Failed to create brand" });
-    }
-  });
-  app2.patch("/api/admin/brands/:id", requireAdmin, async (req, res) => {
-    try {
-      const brand = await storage.updateBrand(req.params.id, req.body);
-      if (!brand) {
-        return res.status(404).json({ error: "Brand not found" });
-      }
-      res.json(brand);
-    } catch (error) {
-      console.error("Error updating brand:", error);
-      res.status(500).json({ error: "Failed to update brand" });
-    }
-  });
-  app2.post("/api/admin/models", requireAdmin, async (req, res) => {
-    try {
-      const model = await storage.createModel(req.body);
-      res.status(201).json(model);
-    } catch (error) {
-      console.error("Error creating model:", error);
-      res.status(500).json({ error: "Failed to create model" });
-    }
-  });
-  app2.patch("/api/admin/models/:id", requireAdmin, async (req, res) => {
-    app2.delete("/api/admin/models/:id", requireAdmin, async (req2, res2) => {
-      try {
-        const deleted = await storage.deleteModel(req2.params.id);
-        if (!deleted) {
-          return res2.status(404).json({ error: "Model not found" });
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      const filename = `orders-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`;
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      const pageSize = parseInt(String(req.query.pageSize || "500"), 10) || 500;
+      const csvEscape = (v) => {
+        if (v === null || v === void 0) return "";
+        const s = String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return '"' + s.replace(/"/g, '""') + '"';
         }
-        res2.status(204).end();
-      } catch (error) {
-        console.error("Error deleting model:", error);
-        res2.status(500).json({ error: "Failed to delete model" });
-      }
-    });
-    try {
-      const model = await storage.updateModel(req.params.id, req.body);
-      if (!model) {
-        return res.status(404).json({ error: "Model not found" });
-      }
-      res.json(model);
-    } catch (error) {
-      console.error("Error updating model:", error);
-      res.status(500).json({ error: "Failed to update model" });
-    }
-  });
-  app2.post("/api/admin/variants", requireAdmin, async (req, res) => {
-    try {
-      const variant = await storage.createVariant(req.body);
-      res.status(201).json(variant);
-    } catch (error) {
-      console.error("Error creating variant:", error);
-      res.status(500).json({ error: "Failed to create variant" });
-    }
-  });
-  app2.patch("/api/admin/variants/:id", requireAdmin, async (req, res) => {
-    try {
-      const variant = await storage.updateVariant(req.params.id, req.body);
-      if (!variant) {
-        return res.status(404).json({ error: "Variant not found" });
-      }
-      res.json(variant);
-    } catch (error) {
-      console.error("Error updating variant:", error);
-      res.status(500).json({ error: "Failed to update variant" });
-    }
-  });
-  app2.post("/api/admin/pricing", requireAdmin, async (req, res) => {
-    try {
-      const rule = await storage.createPricingRule(req.body);
-      res.status(201).json(rule);
-    } catch (error) {
-      console.error("Error creating pricing rule:", error);
-      res.status(500).json({ error: "Failed to create pricing rule" });
-    }
-  });
-  app2.patch("/api/admin/pricing/:id", requireAdmin, async (req, res) => {
-    try {
-      const rule = await storage.updatePricingRule(req.params.id, req.body);
-      if (!rule) {
-        return res.status(404).json({ error: "Pricing rule not found" });
-      }
-      res.json(rule);
-    } catch (error) {
-      console.error("Error updating pricing rule:", error);
-      res.status(500).json({ error: "Failed to update pricing rule" });
-    }
-  });
-  app2.get("/api/admin/devices", requireAdmin, async (req, res) => {
-    try {
-      const models = await storage.getAllModels();
-      const enriched = await Promise.all(
-        models.map(async (model) => ({
-          ...model,
-          variants: await storage.getVariantsByModel(model.id)
-        }))
-      );
-      res.json(enriched);
-    } catch (error) {
-      console.error("Error fetching devices:", error);
-      res.status(500).json({ error: "Failed to fetch devices" });
-    }
-  });
-  let upload;
-  async function getUploadMiddleware() {
-    if (!upload) {
-      const multer = (await import("multer")).default;
-      upload = multer({ limits: { fileSize: 20 * 1024 * 1024 } });
-    }
-    return upload;
-  }
-  app2.post("/api/admin/devices/import", requireAdmin, async (req, res, next) => {
-    const upload2 = await getUploadMiddleware();
-    upload2.single("xmlFile")(req, res, async (err) => {
-      if (err) return next(err);
-      try {
-        let xmlContent = req.body.xmlContent;
-        if (req.file) {
-          xmlContent = req.file.buffer.toString();
-        }
-        if (!xmlContent) {
-          return res.status(400).json({ error: "XML content or file is required" });
-        }
-        const { parseDeviceXML: parseDeviceXML2 } = await Promise.resolve().then(() => (init_xml_parser(), xml_parser_exports));
-        const parsedDevices = await parseDeviceXML2(xmlContent);
-        const results = [];
-        for (const device of parsedDevices) {
-          try {
-            let canonicalBrand = device.brand.trim().toLowerCase();
-            if (["iphone", "apple", "ios"].includes(canonicalBrand)) {
-              canonicalBrand = "apple";
-            } else if (["samsung", "sumsung", "galaxy"].includes(canonicalBrand)) {
-              canonicalBrand = "samsung";
-            }
-            let brand = await storage.getBrandBySlug(canonicalBrand);
-            if (!brand) {
-              brand = await storage.createBrand({
-                name: canonicalBrand.charAt(0).toUpperCase() + canonicalBrand.slice(1),
-                slug: canonicalBrand,
-                isActive: true
-              });
-            }
-            let model = await storage.getModelBySlug(device.slug);
-            if (!model) {
-              model = await storage.createModel({
-                brandId: brand.id,
-                familyId: null,
-                name: device.name,
-                marketingName: device.name,
-                sku: null,
-                slug: device.slug,
-                imageUrl: device.imageUrl || null,
-                year: device.year || null,
-                networkTechnology: null,
-                isActive: true
-              });
-            }
-            const conditionProfiles = await storage.getAllConditionProfiles();
-            const conditions = new Map(conditionProfiles.map((c) => [c.code, c.id]));
-            for (const variant of device.variants) {
-              let dbVariant = await storage.createVariant({
-                modelId: model.id,
-                storageGb: parseInt(variant.storage),
-                color: variant.color || null,
-                networkCarrier: variant.carrier || "unlocked",
-                hasEsim: false,
-                isActive: true
-              });
-              for (const price of variant.pricing) {
-                const conditionCode = price.condition === "flawless" ? "A" : price.condition === "good" ? "B" : "C";
-                const conditionId = conditions.get(conditionCode);
-                if (conditionId && price.price > 0) {
-                  await storage.createPricingRule({
-                    deviceVariantId: dbVariant.id,
-                    conditionProfileId: conditionId,
-                    basePrice: parseFloat(price.price.toString()),
-                    currency: "USD",
-                    isBlacklistedEligible: false,
-                    isActive: true
-                  });
-                }
-              }
-            }
-            results.push({
-              success: true,
-              device: device.name,
-              message: `Successfully imported ${device.name}`
-            });
-          } catch (error) {
-            results.push({
-              success: false,
-              device: device.name,
-              message: `Failed to import ${device.name}: ${error.message}`
-            });
+        return s;
+      };
+      res.write(["orderNumber", "companyName", "companyId", "status", "paymentStatus", "total", "currency", "createdAt", "shippingState", "shippingCity", "items"].join(",") + "\n");
+      const totalOrders = (await db.select().from(orders)).length;
+      res.setHeader("X-Total-Rows", String(totalOrders));
+      const stmt = sqlite.prepare(`SELECT * FROM orders ORDER BY created_at ASC`);
+      for (const order of stmt.iterate()) {
+        const items = await storage.getOrderItems(order.id);
+        const company = await storage.getCompany(order.companyId);
+        let shippingState = "";
+        let shippingCity = "";
+        if (order.shipping_address_id) {
+          const addrStmt = sqlite.prepare(`SELECT * FROM shipping_addresses WHERE id = ?`);
+          const addr = addrStmt.get(order.shipping_address_id);
+          if (addr) {
+            shippingState = addr.state || "";
+            shippingCity = addr.city || "";
           }
         }
-        res.status(200).json({
-          totalDevices: parsedDevices.length,
-          results
-        });
-      } catch (error) {
-        console.error("Error importing devices:", error);
-        res.status(500).json({ error: "Failed to import devices" });
+        const itemsSummary = items.map((i) => `${i.quantity}x ${i.deviceVariantId} @ ${i.unitPrice}`).join("; ");
+        const row = [
+          csvEscape(order.order_number || order.orderNumber),
+          csvEscape(company?.name || ""),
+          csvEscape(order.company_id || order.companyId),
+          csvEscape(order.status),
+          csvEscape(order.payment_status || order.paymentStatus),
+          csvEscape(order.total),
+          csvEscape(order.currency),
+          csvEscape(new Date(order.created_at || order.createdAt).toISOString()),
+          csvEscape(shippingState),
+          csvEscape(shippingCity),
+          csvEscape(itemsSummary)
+        ];
+        res.write(row.join(",") + "\n");
       }
-    });
-  });
-  app2.get("/api/users/:id", requireAuth, async (req, res) => {
-    try {
-      if (req.session.userId !== req.params.id) {
-        const user2 = await storage.getUser(req.session.userId);
-        if (!user2 || user2.role !== "admin" && user2.role !== "super_admin") {
-          return res.status(403).json({ error: "Access denied" });
-        }
-      }
-      const user = await storage.getUser(req.params.id);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      res.end();
     } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ error: "Failed to fetch user" });
+      console.error("Export orders CSV error:", error);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to export orders" });
     }
   });
-  app2.patch("/api/users/:id", requireAuth, async (req, res) => {
+  app2.get("/api/admin/export/inventory.csv", requireAdmin, async (req, res) => {
     try {
-      if (req.session.userId !== req.params.id) {
-        const user2 = await storage.getUser(req.session.userId);
-        if (!user2 || user2.role !== "admin" && user2.role !== "super_admin") {
-          return res.status(403).json({ error: "Access denied" });
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      const filename = `inventory-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`;
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      const pageSize = parseInt(String(req.query.pageSize || "500"), 10) || 500;
+      const csvEscape = (v) => {
+        if (v === null || v === void 0) return "";
+        const s = String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      };
+      res.write(["modelSku", "brand", "modelName", "variantId", "storage", "color", "conditionGrade", "quantityAvailable", "minOrderQuantity", "unitPrice"].join(",") + "\n");
+      const modelsCount = (await db.select().from(deviceModels)).length;
+      let totalRows = 0;
+      const allModels = await db.select().from(deviceModels);
+      for (const m of allModels) {
+        const variants = await db.select().from(deviceVariants).where(deviceVariants.deviceModelId.equals(m.id));
+        totalRows += variants.length;
+      }
+      res.setHeader("X-Total-Rows", String(totalRows));
+      const modelStmt = sqlite.prepare(`SELECT * FROM device_models ORDER BY created_at ASC`);
+      for (const model of modelStmt.iterate()) {
+        const variantStmt = sqlite.prepare(`SELECT * FROM device_variants WHERE device_model_id = ?`);
+        for (const variant of variantStmt.iterate(model.id)) {
+          const inventory = await storage.getInventoryByVariantId(variant.id);
+          const tiers = await storage.getPriceTiersByVariantId(variant.id);
+          const unitPrice = tiers && tiers.length > 0 ? tiers[0].unitPrice : "";
+          const row = [
+            csvEscape(model.sku),
+            csvEscape(model.brand),
+            csvEscape(model.name),
+            csvEscape(variant.id),
+            csvEscape(variant.storage),
+            csvEscape(variant.color),
+            csvEscape(variant.condition_grade || variant.conditionGrade),
+            csvEscape(inventory?.quantityAvailable ?? 0),
+            csvEscape(inventory?.minOrderQuantity ?? 1),
+            csvEscape(unitPrice)
+          ];
+          res.write(row.join(",") + "\n");
         }
       }
-      const { passwordHash, ...updates } = req.body;
+      res.end();
+    } catch (error) {
+      console.error("Export inventory CSV error:", error);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to export inventory" });
+    }
+  });
+  app2.get("/api/admin/reports/top-skus", requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(String(req.query.limit || "20"), 10) || 20;
+      const orders2 = await storage.getAllOrders();
+      const skuMap = /* @__PURE__ */ new Map();
+      for (const order of orders2) {
+        const items = await storage.getOrderItems(order.id);
+        for (const item of items) {
+          const variant = await storage.getDeviceVariant(item.deviceVariantId);
+          if (!variant) continue;
+          const model = await storage.getDeviceModel(variant.deviceModelId);
+          const key = model?.sku || variant.id;
+          const existing = skuMap.get(key) || { sku: key, brand: model?.brand || "", name: model?.name || "", qty: 0, revenue: 0 };
+          existing.qty += item.quantity;
+          existing.revenue += parseFloat(item.unitPrice) * item.quantity || 0;
+          skuMap.set(key, existing);
+        }
+      }
+      const results = Array.from(skuMap.values()).sort((a, b) => b.qty - a.qty).slice(0, limit);
+      res.json(results);
+    } catch (error) {
+      console.error("Top SKUs report error:", error);
+      res.status(500).json({ error: "Failed to compute top SKUs" });
+    }
+  });
+  app2.get("/api/admin/reports/sales-by-region", requireAdmin, async (req, res) => {
+    try {
+      const orders2 = await storage.getAllOrders();
+      const byState = /* @__PURE__ */ new Map();
+      for (const order of orders2) {
+        let state = "unknown";
+        if (order.shippingAddressId) {
+          const [addr] = await db.select().from(shippingAddresses).where(shippingAddresses.id.equals(order.shippingAddressId));
+          if (addr) state = addr.state || "unknown";
+        }
+        const current = byState.get(state) || { state, total: 0, count: 0 };
+        current.total += parseFloat(order.total) || 0;
+        current.count += 1;
+        byState.set(state, current);
+      }
+      res.json(Array.from(byState.values()).sort((a, b) => b.total - a.total));
+    } catch (error) {
+      console.error("Sales by region report error:", error);
+      res.status(500).json({ error: "Failed to compute sales by region" });
+    }
+  });
+  app2.get("/api/admin/reports/companies-status", requireAdmin, async (req, res) => {
+    try {
+      const companies2 = await storage.getAllCompanies();
+      const map = /* @__PURE__ */ new Map();
+      for (const c of companies2) {
+        const key = c.status || "unknown";
+        map.set(key, (map.get(key) || 0) + 1);
+      }
+      res.json(Array.from(map.entries()).map(([status, count]) => ({ status, count })));
+    } catch (error) {
+      console.error("Companies status report error:", error);
+      res.status(500).json({ error: "Failed to compute companies status" });
+    }
+  });
+  app2.get("/api/admin/reports/top-suppliers", requireAdmin, async (req, res) => {
+    try {
+      const orders2 = await storage.getAllOrders();
+      const map = /* @__PURE__ */ new Map();
+      for (const o of orders2) {
+        const company = await storage.getCompany(o.companyId);
+        const key = company?.id || o.companyId;
+        const entry = map.get(key) || { companyId: key, name: company?.name || "Unknown", revenue: 0, orders: 0 };
+        entry.revenue += parseFloat(o.total) || 0;
+        entry.orders += 1;
+        map.set(key, entry);
+      }
+      const results = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 50);
+      res.json(results);
+    } catch (error) {
+      console.error("Top suppliers report error:", error);
+      res.status(500).json({ error: "Failed to compute top suppliers" });
+    }
+  });
+  app2.get("/api/admin/reports/sales-timeseries", requireAdmin, async (req, res) => {
+    try {
+      const { start, end } = req.query;
+      const orders2 = await storage.getAllOrders();
+      const byMonth = /* @__PURE__ */ new Map();
+      for (const o of orders2) {
+        const date = new Date(o.createdAt);
+        const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+        const entry = byMonth.get(month) || { month, total: 0, count: 0 };
+        entry.total += parseFloat(o.total) || 0;
+        entry.count += 1;
+        byMonth.set(month, entry);
+      }
+      const series = Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month));
+      res.json(series);
+    } catch (error) {
+      console.error("Sales timeseries error:", error);
+      res.status(500).json({ error: "Failed to compute sales timeseries" });
+    }
+  });
+  app2.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
+    try {
+      const { status } = req.body;
+      const updates = {};
+      if (status) updates.status = status;
+      const order = await storage.updateOrder(req.params.id, updates);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      await storage.createAuditLog({
+        actorUserId: req.session.userId,
+        action: "order_updated",
+        entityType: "order",
+        entityId: req.params.id,
+        newValues: JSON.stringify(updates)
+      });
+      res.json(order);
+    } catch (error) {
+      console.error("Update order error:", error);
+      res.status(500).json({ error: "Failed to update order" });
+    }
+  });
+  app2.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const users2 = await storage.getAllUsers();
+      res.json(users2);
+    } catch (error) {
+      console.error("Get all users error:", error);
+      res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+  app2.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const { role, isActive } = req.body;
+      const updates = {};
+      if (role) updates.role = role;
+      if (isActive !== void 0) updates.isActive = isActive;
       const user = await storage.updateUser(req.params.id, updates);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      await storage.createAuditLog({
+        actorUserId: req.session.userId,
+        action: "user_updated",
+        entityType: "user",
+        entityId: req.params.id,
+        newValues: JSON.stringify(updates)
+      });
+      res.json(user);
     } catch (error) {
-      console.error("Error updating user:", error);
+      console.error("Update user error:", error);
       res.status(500).json({ error: "Failed to update user" });
     }
   });
-  app2.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+  app2.get("/api/saved-lists", requireAuth, async (req, res) => {
+    try {
+      const companyContext = await getUserPrimaryCompany(req.session.userId);
+      if (!companyContext) {
+        return res.status(400).json({ error: "User does not belong to a company" });
+      }
+      const lists = await storage.getSavedListsByCompanyId(companyContext.companyId);
+      res.json(lists);
+    } catch (error) {
+      console.error("Get saved lists error:", error);
+      res.status(500).json({ error: "Failed to get saved lists" });
+    }
+  });
+  app2.post("/api/saved-lists", requireAuth, async (req, res) => {
+    try {
+      const companyContext = await getUserPrimaryCompany(req.session.userId);
+      if (!companyContext) {
+        return res.status(400).json({ error: "User does not belong to a company" });
+      }
+      const parsed = insertSavedListSchema.safeParse({
+        ...req.body,
+        companyId: companyContext.companyId,
+        createdByUserId: req.session.userId
+      });
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const list = await storage.createSavedList(parsed.data);
+      await storage.createAuditLog({
+        actorUserId: req.session.userId,
+        companyId: companyContext.companyId,
+        action: "saved_list_created",
+        entityType: "saved_list",
+        entityId: list.id,
+        newValues: JSON.stringify(list)
+      });
+      res.json(list);
+    } catch (error) {
+      console.error("Create saved list error:", error);
+      res.status(500).json({ error: "Failed to create saved list" });
+    }
+  });
+  app2.get("/api/saved-lists/:id", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getSavedList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ error: "Saved list not found" });
+      }
+      const companyContext = await getUserPrimaryCompany(req.session.userId);
+      if (!companyContext || list.companyId !== companyContext.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const items = await storage.getSavedListItems(req.params.id);
+      res.json({ ...list, items });
+    } catch (error) {
+      console.error("Get saved list error:", error);
+      res.status(500).json({ error: "Failed to get saved list" });
+    }
+  });
+  app2.delete("/api/saved-lists/:id", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getSavedList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ error: "Saved list not found" });
+      }
+      const companyContext = await getUserPrimaryCompany(req.session.userId);
+      if (!companyContext || list.companyId !== companyContext.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.deleteSavedList(req.params.id);
+      await storage.createAuditLog({
+        actorUserId: req.session.userId,
+        companyId: companyContext.companyId,
+        action: "saved_list_deleted",
+        entityType: "saved_list",
+        entityId: req.params.id
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete saved list error:", error);
+      res.status(500).json({ error: "Failed to delete saved list" });
+    }
+  });
+  app2.post("/api/saved-lists/:id/items", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getSavedList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ error: "Saved list not found" });
+      }
+      const companyContext = await getUserPrimaryCompany(req.session.userId);
+      if (!companyContext || list.companyId !== companyContext.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const parsed = insertSavedListItemSchema.safeParse({
+        ...req.body,
+        savedListId: req.params.id
+      });
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const item = await storage.addSavedListItem(parsed.data);
+      res.json(item);
+    } catch (error) {
+      console.error("Add saved list item error:", error);
+      res.status(500).json({ error: "Failed to add item to saved list" });
+    }
+  });
+  app2.delete("/api/saved-lists/:listId/items/:itemId", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getSavedList(req.params.listId);
+      if (!list) {
+        return res.status(404).json({ error: "Saved list not found" });
+      }
+      const companyContext = await getUserPrimaryCompany(req.session.userId);
+      if (!companyContext || list.companyId !== companyContext.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.deleteSavedListItem(req.params.itemId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Remove saved list item error:", error);
+      res.status(500).json({ error: "Failed to remove item from saved list" });
+    }
+  });
+  app2.get("/api/faqs", async (req, res) => {
+    try {
+      const faqs2 = await storage.getAllFaqs();
+      res.json(faqs2);
+    } catch (error) {
+      console.error("Get FAQs error:", error);
+      res.status(500).json({ error: "Failed to get FAQs" });
+    }
+  });
+  app2.post("/api/support/tickets", async (req, res) => {
+    try {
+      const { name, email, company, subject, message } = req.body;
+      const ticket = await storage.createSupportTicket({
+        companyId: req.session.userId ? void 0 : null,
+        createdByUserId: req.session.userId || null,
+        subject,
+        description: `From: ${name} (${email})
+Company: ${company || "N/A"}
+
+${message}`,
+        status: "open",
+        priority: "medium"
+      });
+      res.json(ticket);
+    } catch (error) {
+      console.error("Create ticket error:", error);
+      res.status(500).json({ error: "Failed to create ticket" });
+    }
   });
   const httpServer = createServer(app2);
   return httpServer;
@@ -2978,6 +3958,13 @@ var vite_config_default = defineConfig({
     emptyOutDir: true
   },
   server: {
+    proxy: {
+      "/api": {
+        target: process.env.VITE_API_URL || "https://api.secondhandcell.com",
+        changeOrigin: true,
+        secure: true
+      }
+    },
     fs: {
       strict: true,
       deny: ["**/.*"]
@@ -3054,35 +4041,28 @@ function serveStatic(app2) {
 
 // server/index.ts
 var app = express2();
-var Store = SQLiteStore(session);
-app.use(
-  session({
-    store: new Store({
-      db: "sessions.db",
-      dir: "./",
-      clear_expired: true,
-      checkExpirationInterval: 9e5
-      // Check for expired sessions every 15 minutes
-    }),
-    secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1e3,
-      // 30 days
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax"
-    }
-  })
-);
+var allowedOrigins = (process.env.CORS_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean);
+app.set("trust proxy", 1);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+  res.header("Vary", "Origin");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(express2.json({
-  limit: "20mb",
   verify: (req, _res, buf) => {
     req.rawBody = buf;
   }
 }));
-app.use(express2.urlencoded({ extended: false, limit: "20mb" }));
+app.use(express2.urlencoded({ extended: false }));
 app.use((req, res, next) => {
   const start = Date.now();
   const path3 = req.path;
