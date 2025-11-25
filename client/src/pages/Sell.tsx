@@ -72,7 +72,8 @@ export default function Sell() {
     queryFn: async () => {
       const res = await fetch(getApiUrl("/api/brands"));
       if (!res.ok) throw new Error("Failed to load brands");
-      return res.json();
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
   });
 
@@ -81,7 +82,8 @@ export default function Sell() {
     queryFn: async () => {
       const res = await fetch(getApiUrl(`/api/models?brandId=${selectedBrand}`));
       if (!res.ok) throw new Error("Failed to load models");
-      return res.json();
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!selectedBrand,
   });
@@ -91,7 +93,8 @@ export default function Sell() {
     queryFn: async () => {
       const res = await fetch(getApiUrl("/api/conditions"));
       if (!res.ok) throw new Error("Failed to load conditions");
-      return res.json();
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
   });
 

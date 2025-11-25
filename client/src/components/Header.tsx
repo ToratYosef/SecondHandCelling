@@ -8,12 +8,7 @@ import { getApiUrl } from "@/lib/api";
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string>("");
-  // Fetch sitewide logo
-  useState(() => {
-    fetch(getApiUrl("/api/settings")).then(res => res.json()).then(data => {
-      if (data.logoUrl) setLogoUrl(data.logoUrl);
-    }).catch(() => {});
-  });
+  // Logo fetching disabled - configure via SITE_LOGO_URL env var on backend if needed
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background">

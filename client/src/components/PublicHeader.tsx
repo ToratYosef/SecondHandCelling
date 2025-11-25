@@ -8,11 +8,7 @@ import { getApiUrl } from "@/lib/api";
 
 export function PublicHeader() {
   const [logoUrl, setLogoUrl] = useState<string>("");
-  useState(() => {
-    fetch(getApiUrl("/api/settings")).then(res => res.json()).then(data => {
-      if (data.logoUrl) setLogoUrl(data.logoUrl);
-    }).catch(() => {});
-  });
+  // Logo fetching disabled - configure via SITE_LOGO_URL env var on backend if needed
 
   return (
     <>

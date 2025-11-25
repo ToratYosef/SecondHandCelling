@@ -76,8 +76,8 @@ export default function AdminPricing() {
       if (!pricingRules) return;
       const header = ["Device","Variant","Condition","Base Price"];
       const rows = pricingRules.map(rule => {
-        const device = devices?.find(d => d.variants.some(v => v.id === rule.variantId));
-        const variant = device?.variants.find(v => v.id === rule.variantId);
+        const device: any = devices?.find((d: any) => d.variants.some((v: any) => v.id === rule.variantId));
+        const variant = device?.variants.find((v: { id: any; }) => v.id === rule.variantId);
         const condition = conditions?.find(c => c.id === rule.conditionProfileId);
         return [device?.name, `${variant?.storageGb}GB ${variant?.color || ''} ${variant?.networkCarrier}`, condition?.name, rule.basePrice];
       });
@@ -98,7 +98,7 @@ export default function AdminPricing() {
       for (let i = 1; i < lines.length; i++) {
         const [deviceName, variantStr, conditionName, basePrice] = lines[i].split(',');
         const device = devices?.find(d => d.name === deviceName);
-        const variant = device?.variants.find(v => `${v.storageGb}GB ${v.color || ''} ${v.networkCarrier}` === variantStr);
+        const variant = device?.variants.find((v: { storageGb: any; color: any; networkCarrier: any; }) => `${v.storageGb}GB ${v.color || ''} ${v.networkCarrier}` === variantStr);
         const condition = conditions?.find(c => c.name === conditionName);
         const rule = pricingRules?.find(r => r.variantId === variant?.id && r.conditionProfileId === condition?.id);
         if (rule && basePrice) {
@@ -306,7 +306,7 @@ export default function AdminPricing() {
               {devices.map((device) => (
                 <div key={device.id} className="mb-8">
                   <h2 className="text-xl font-bold mb-2">{device.name}</h2>
-                  {device.variants.map((variant) => (
+                  {device.variants.map((variant: any) => (
                     <div key={variant.id} className="mb-4">
                       <h3 className="font-semibold">Variant: {variant.storageGb}GB {variant.color || ''} {variant.networkCarrier}</h3>
                       <Table>
