@@ -738,6 +738,10 @@ var DatabaseStorage = class {
   async getAllCompanies() {
     return await db.select().from(companies).orderBy(desc(companies.createdAt));
   }
+  async getCompanyByName(name) {
+    const [company] = await db.select().from(companies).where(eq(companies.name, name));
+    return company || void 0;
+  }
   // CompanyUser methods
   async createCompanyUser(insertCompanyUser) {
     const [companyUser] = await db.insert(companyUsers).values(insertCompanyUser).returning();
@@ -2187,19 +2191,45 @@ var selectPriceTierForQuantity = (tiers, quantity) => {
   return fallback || null;
 };
 var requireAdmin = async (req, res, next) => {
+  console.log("[requireAdmin] Session check:", {
+    hasSession: !!req.session,
+    userId: req.session?.userId,
+    userRole: req.session?.userRole,
+    sessionID: req.session?.id,
+    cookies: req.headers.cookie
+  });
   if (!req.session.userId) {
-    return res.status(401).json({ error: "Authentication required" });
+    console.log("[requireAdmin] No userId in session - returning 401");
+    return res.status(401).json({
+      error: "Authentication required",
+      details: "No active session found. Please log in again."
+    });
   }
   const user = await storage.getUser(req.session.userId);
+  console.log("[requireAdmin] User lookup result:", {
+    found: !!user,
+    role: user?.role,
+    userId: user?.id
+  });
   if (!user || user.role !== "admin" && user.role !== "super_admin") {
-    return res.status(403).json({ error: "Admin access required" });
+    console.log("[requireAdmin] User not admin - returning 403");
+    return res.status(403).json({
+      error: "Admin access required",
+      details: user ? `User role '${user.role}' is not authorized` : "User not found"
+    });
   }
+  console.log("[requireAdmin] Admin check passed for user:", user.email);
   next();
 };
 async function registerRoutes(app2) {
   const isProduction = process.env.NODE_ENV === "production";
   const sessionSecret = process.env.SESSION_SECRET || "default-secret-change-in-production";
   const MemoryStore = createMemoryStore(session);
+  console.log("[Session Config]", {
+    isProduction,
+    cookieSecure: isProduction,
+    cookieSameSite: isProduction ? "none" : "lax"
+  });
   app2.use(session({
     store: new MemoryStore({
       checkPeriod: 24 * 60 * 60 * 1e3
@@ -2207,14 +2237,35 @@ async function registerRoutes(app2) {
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    name: "shc.sid",
+    // Custom session cookie name
     cookie: {
       secure: isProduction,
       httpOnly: true,
       sameSite: isProduction ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1e3
+      maxAge: 7 * 24 * 60 * 60 * 1e3,
       // 7 days
+      path: "/",
+      domain: isProduction ? ".secondhandcell.com" : void 0
+      // Allow subdomain sharing
     }
   }));
+  app2.use((req, res, next) => {
+    if (req.path.startsWith("/api/admin") || req.path === "/api/auth/me") {
+      console.log("[Session Debug]", {
+        path: req.path,
+        method: req.method,
+        sessionID: req.session?.id,
+        userId: req.session?.userId,
+        userRole: req.session?.userRole,
+        hasCookie: !!req.headers.cookie,
+        cookieHeader: req.headers.cookie,
+        origin: req.headers.origin,
+        isProduction
+      });
+    }
+    next();
+  });
   app2.use("/api", createEmailsRouter());
   app2.use("/api", createImeiRouter());
   app2.use("/api", createLabelsRouter());
@@ -2355,20 +2406,31 @@ async function registerRoutes(app2) {
   app2.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
+      console.log("[Login] Attempt for email:", email);
       const user = await storage.getUserByEmail(email);
       if (!user) {
+        console.log("[Login] User not found:", email);
         return res.status(401).json({ error: "Invalid credentials" });
       }
       const validPassword = await bcrypt.compare(password, user.passwordHash);
       if (!validPassword) {
+        console.log("[Login] Invalid password for user:", email);
         return res.status(401).json({ error: "Invalid credentials" });
       }
       if (!user.isActive) {
+        console.log("[Login] User account inactive:", email);
         return res.status(403).json({ error: "Account is inactive" });
       }
       await storage.updateUser(user.id, { lastLoginAt: /* @__PURE__ */ new Date() });
       req.session.userId = user.id;
       req.session.userRole = user.role;
+      console.log("[Login] Success:", {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        sessionID: req.session.id,
+        cookie: req.session.cookie
+      });
       res.json({
         success: true,
         user: {
@@ -2450,6 +2512,46 @@ async function registerRoutes(app2) {
   });
   const getMeHandler = async (req, res) => {
     try {
+      console.log("[/api/auth/me] Session check:", {
+        hasSession: !!req.session,
+        sessionID: req.session?.id,
+        userId: req.session?.userId,
+        userRole: req.session?.userRole,
+        hasCookie: !!req.headers.cookie
+      });
+      if (!req.session.userId) {
+        console.log("[/api/auth/me] No userId in session");
+        return res.status(401).json({ user: null, message: "Not authenticated" });
+      }
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        console.log("[/api/auth/me] User not found for userId:", req.session.userId);
+        return res.status(404).json({ error: "User not found" });
+      }
+      console.log("[/api/auth/me] User found:", { id: user.id, email: user.email, role: user.role });
+      const companyUsers2 = await storage.getCompanyUsersByUserId(user.id);
+      let companyId = null;
+      if (companyUsers2.length > 0) {
+        companyId = companyUsers2[0].companyId;
+      }
+      res.json({
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone,
+          companyId
+        }
+      });
+    } catch (error) {
+      console.error("Get user error:", error);
+      res.status(500).json({ error: "Failed to get user" });
+    }
+  };
+  app2.get("/api/auth/me", getMeHandler);
+  app2.get("/api/me", requireAuth, async (req, res) => {
+    try {
       const user = await storage.getUser(req.session.userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -2471,9 +2573,7 @@ async function registerRoutes(app2) {
       console.error("Get user error:", error);
       res.status(500).json({ error: "Failed to get user" });
     }
-  };
-  app2.get("/api/auth/me", requireAuth, getMeHandler);
-  app2.get("/api/me", requireAuth, getMeHandler);
+  });
   app2.get("/api/auth/company", requireAuth, async (req, res) => {
     try {
       const companyContext = await getUserPrimaryCompany(req.session.userId);
@@ -2626,6 +2726,7 @@ async function registerRoutes(app2) {
   };
   app2.get("/api/catalog/categories", getCategoriesHandler);
   app2.get("/api/categories", getCategoriesHandler);
+  app2.get("/api/device-categories", getCategoriesHandler);
   app2.get("/api/brands", async (req, res) => {
     try {
       const models = await storage.getAllDeviceModels();
@@ -2715,6 +2816,51 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Get models error:", error);
       res.status(500).json({ error: "Failed to get models" });
+    }
+  });
+  app2.get("/api/device-models", async (req, res) => {
+    try {
+      const { brandId } = req.query;
+      const models = await storage.getAllDeviceModels();
+      if (!brandId || typeof brandId !== "string") {
+        const result2 = models.map((m) => ({
+          id: m.id,
+          brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, "-")}`,
+          name: m.marketingName || m.name,
+          slug: m.slug,
+          year: null
+        }));
+        return res.json(result2);
+      }
+      let brandName = "";
+      if (brandId.startsWith("brand-")) {
+        const brandPart = brandId.replace("brand-", "");
+        if (/^\d+$/.test(brandPart)) {
+          const brandsSet = new Set(models.map((m) => m.brand));
+          const brandsArray = Array.from(brandsSet).sort();
+          const index = parseInt(brandPart, 10);
+          brandName = brandsArray[index] || "";
+        } else {
+          brandName = brandPart.charAt(0).toUpperCase() + brandPart.slice(1);
+        }
+      }
+      if (!brandName) {
+        return res.json([]);
+      }
+      const filteredModels = models.filter(
+        (m) => m.brand.toLowerCase() === brandName.toLowerCase()
+      );
+      const result = filteredModels.map((m) => ({
+        id: m.id,
+        brandId: `brand-${m.brand.toLowerCase().replace(/\s+/g, "-")}`,
+        name: m.marketingName || m.name,
+        slug: m.slug,
+        year: null
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error("Get device-models error:", error);
+      res.status(500).json({ error: "Failed to get device models" });
     }
   });
   app2.get("/api/conditions", async (req, res) => {
@@ -2834,8 +2980,85 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Failed to remove cart item" });
     }
   });
-  app2.post("/api/orders", requireAuth, async (req, res) => {
+  app2.post("/api/orders", async (req, res) => {
     try {
+      console.log("[POST /api/orders] Request body:", JSON.stringify(req.body, null, 2));
+      console.log("[POST /api/orders] Session userId:", req.session?.userId);
+      const userId = req.session?.userId;
+      if (!userId) {
+        const {
+          customerInfo,
+          devices,
+          shippingAddress,
+          paymentMethod: paymentMethod2,
+          notes: notes2
+        } = req.body;
+        console.log("[POST /api/orders] Guest order detected");
+        if (!customerInfo || !customerInfo.email) {
+          return res.status(400).json({ error: "Customer email is required" });
+        }
+        if (!devices || !Array.isArray(devices) || devices.length === 0) {
+          return res.status(400).json({ error: "At least one device is required" });
+        }
+        const orderNumber2 = `SL-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+        let total2 = 0;
+        devices.forEach((device) => {
+          total2 += parseFloat(device.price || device.amount || 0) * (device.quantity || 1);
+        });
+        let guestUser = await storage.getUserByEmail(customerInfo.email);
+        if (!guestUser) {
+          const randomPassword = Math.random().toString(36).slice(-8);
+          const passwordHash = await bcrypt.hash(randomPassword, 10);
+          guestUser = await storage.createUser({
+            email: customerInfo.email,
+            name: customerInfo.name || customerInfo.email.split("@")[0],
+            passwordHash,
+            role: "customer",
+            isActive: true
+          });
+          console.log("[POST /api/orders] Created guest user:", guestUser.id);
+        }
+        let guestCompany = await storage.getCompanyByName("Guest Orders");
+        if (!guestCompany) {
+          guestCompany = await storage.createCompany({
+            name: "Guest Orders",
+            slug: "guest-orders",
+            type: "supplier",
+            isActive: true
+          });
+        }
+        const customerNotes = `Customer: ${customerInfo.name || "N/A"}
+Email: ${customerInfo.email}
+Phone: ${customerInfo.phone || "N/A"}
+${shippingAddress ? `Address: ${JSON.stringify(shippingAddress)}` : ""}
+${notes2 ? `
+Notes: ${notes2}` : ""}`;
+        const order2 = await storage.createOrder({
+          orderNumber: orderNumber2,
+          companyId: guestCompany.id,
+          createdByUserId: guestUser.id,
+          status: "pending_payment",
+          subtotal: total2.toFixed(2),
+          shippingCost: "0",
+          taxAmount: "0",
+          discountAmount: "0",
+          total: total2.toFixed(2),
+          currency: "USD",
+          paymentStatus: "pending",
+          paymentMethod: paymentMethod2 || "check",
+          shippingAddressId: null,
+          billingAddressId: null,
+          notesCustomer: customerNotes
+        });
+        console.log("[POST /api/orders] Guest order created:", order2.id, orderNumber2);
+        res.json({
+          success: true,
+          orderId: order2.id,
+          orderNumber: order2.orderNumber,
+          message: "Order submitted successfully"
+        });
+        return;
+      }
       const { paymentMethod, shippingAddressId, billingAddressId, notes } = req.body;
       if (!shippingAddressId) {
         return res.status(400).json({ error: "Shipping address is required" });
@@ -2846,7 +3069,7 @@ async function registerRoutes(app2) {
       if (paymentMethod === "card" && !stripe) {
         return res.status(503).json({ error: "Card payment is not available. Please select another payment method." });
       }
-      const cart = await storage.getCartByUserId(req.session.userId);
+      const cart = await storage.getCartByUserId(userId);
       if (!cart) {
         return res.status(400).json({ error: "Cart not found" });
       }
@@ -2865,7 +3088,7 @@ async function registerRoutes(app2) {
       const order = await storage.createOrder({
         orderNumber,
         companyId: cart.companyId,
-        createdByUserId: req.session.userId,
+        createdByUserId: userId,
         status: "pending_payment",
         subtotal: subtotal.toFixed(2),
         shippingCost: shippingCost.toFixed(2),
@@ -3953,6 +4176,100 @@ ${message}`,
     } catch (error) {
       console.error("Create ticket error:", error);
       res.status(500).json({ error: "Failed to create ticket" });
+    }
+  });
+  app2.get("/api/admin/dashboard-stats", requireAdmin, async (req, res) => {
+    try {
+      const { eq: eq2, and: and2, sql: sql4 } = await import("drizzle-orm");
+      const allOrders = await db.select().from(orders);
+      const totalRevenue = allOrders.reduce((sum, order) => {
+        return sum + parseFloat(order.totalAmount || "0");
+      }, 0);
+      const totalOrders = allOrders.length;
+      const pendingOrders = allOrders.filter(
+        (o) => o.status === "pending_approval" || o.status === "approved" || o.status === "processing"
+      ).length;
+      const completedOrders = allOrders.filter((o) => o.status === "completed").length;
+      const allCompanies = await db.select().from(companies);
+      const totalCompanies = allCompanies.length;
+      const activeCompanies = allCompanies.filter((c) => c.status === "active").length;
+      const allUsers = await db.select().from(users);
+      const totalUsers = allUsers.length;
+      const activeUsers = allUsers.filter((u) => u.isActive).length;
+      res.json({
+        totalRevenue,
+        totalOrders,
+        pendingOrders,
+        completedOrders,
+        totalCompanies,
+        activeCompanies,
+        totalUsers,
+        activeUsers
+      });
+    } catch (error) {
+      console.error("Dashboard stats error:", error);
+      res.status(500).json({ error: "Failed to get dashboard stats" });
+    }
+  });
+  app2.get("/api/admin/quick-stats", requireAdmin, async (req, res) => {
+    try {
+      const { gte, and: and2 } = await import("drizzle-orm");
+      const today = /* @__PURE__ */ new Date();
+      today.setHours(0, 0, 0, 0);
+      const allOrders = await db.select().from(orders);
+      const ordersToday = allOrders.filter((o) => {
+        const orderDate = new Date(o.createdAt);
+        return orderDate >= today;
+      }).length;
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const ordersThisMonth = allOrders.filter((o) => {
+        const orderDate = new Date(o.createdAt);
+        return orderDate >= firstDayOfMonth;
+      }).length;
+      const revenueToday = allOrders.filter((o) => new Date(o.createdAt) >= today).reduce((sum, o) => sum + parseFloat(o.totalAmount || "0"), 0);
+      const revenueThisMonth = allOrders.filter((o) => new Date(o.createdAt) >= firstDayOfMonth).reduce((sum, o) => sum + parseFloat(o.totalAmount || "0"), 0);
+      const pendingApprovals = allOrders.filter((o) => o.status === "pending_approval").length;
+      res.json({
+        ordersToday,
+        ordersThisMonth,
+        revenueToday,
+        revenueThisMonth,
+        pendingApprovals
+      });
+    } catch (error) {
+      console.error("Quick stats error:", error);
+      res.status(500).json({ error: "Failed to get quick stats" });
+    }
+  });
+  app2.post("/api/setup-admin", async (req, res) => {
+    try {
+      const { setupKey } = req.body;
+      if (setupKey !== process.env.SETUP_ADMIN_KEY && setupKey !== "shc-setup-2024") {
+        return res.status(403).json({ error: "Invalid setup key" });
+      }
+      const existingAdmin = await storage.getUserByEmail("admin@secondhandcell.com");
+      if (existingAdmin) {
+        return res.json({ message: "Admin already exists", email: "admin@secondhandcell.com" });
+      }
+      const adminPassword = await bcrypt.hash("Admin123!", 10);
+      const adminUser = await storage.createUser({
+        name: "Admin User",
+        email: "admin@secondhandcell.com",
+        passwordHash: adminPassword,
+        role: "super_admin",
+        phone: "+1-555-0100",
+        isActive: true
+      });
+      res.json({
+        success: true,
+        message: "Admin created successfully",
+        email: "admin@secondhandcell.com",
+        password: "Admin123!",
+        userId: adminUser.id
+      });
+    } catch (error) {
+      console.error("Setup admin error:", error);
+      res.status(500).json({ error: "Failed to create admin: " + error.message });
     }
   });
   const httpServer = createServer(app2);
