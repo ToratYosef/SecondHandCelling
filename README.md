@@ -1,84 +1,86 @@
-# SecondHandCell - Full-Stack Application
+# SHC-API
 
-SecondHandCell is a complete B2B e-commerce platform for buying and selling second-hand devices.
+SecondHandCell API - Express.js backend with PostgreSQL (Neon), Stripe payments, email notifications, and shipping integrations.
 
-## 🚀 Features
+## Features
 
-- 🗄️ **PostgreSQL Database** with Drizzle ORM
+- 🗄️ **PostgreSQL Database** with Drizzle ORM (Neon serverless)
 - 📧 **Email Service** via Nodemailer (Gmail SMTP)
 - 💳 **Stripe Integration** for payment processing
 - 📦 **Shipping Services**: ShipStation & ShipEngine APIs
 - 📱 **IMEI/ESN Validation** via PhoneCheck API
 - 🔐 **Session Management** with express-session
-- ⚛️ **React Frontend** with Vite, TailwindCSS, and shadcn/ui
-- 🎨 **Modern TypeScript** setup throughout
+- 🚀 **Modern TypeScript** setup with Vite
 
-## 📚 Documentation
-
-- **[CONNECTION_COMPLETE.md](./CONNECTION_COMPLETE.md)** - ✅ Frontend-Backend connection guide
-- **[FRONTEND_BACKEND_CONNECTION.md](./FRONTEND_BACKEND_CONNECTION.md)** - Detailed API integration guide
-- **[RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md)** - Complete deployment instructions
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - General deployment guide
-
-## 🏃 Quick Start
-
-### Backend API
-
-The backend is already deployed at: **https://shc-api.onrender.com**
-
-### Frontend Development
+## Quick Start
 
 1. **Clone and Install**:
    ```bash
-   git clone https://github.com/ToratYosef/SecondHandCelling.git
-   cd SecondHandCelling
+   git clone https://github.com/ToratYosef/SHC-API.git
+   cd SHC-API
    npm install
    ```
 
 2. **Configure Environment**:
    ```bash
    cp .env.example .env
-   # The API URL is already configured in .env.local
+   # Edit .env with your actual credentials
    ```
 
-3. **Run Development Server**:
+3. **Setup Database**:
    ```bash
-   npm run dev
+   npm run db:push    # Push schema to Neon PostgreSQL
+   npm run seed       # Seed initial data
    ```
-   
-   The frontend will be available at http://localhost:5173
 
-4. **Test the Connection**:
+4. **Run Development Server**:
    ```bash
-   node test-connection.js
+   npm run dev        # Full app with Vite
+   # OR
+   npm run dev:api    # API only (faster)
    ```
 
-## 🔧 Development Scripts
+## Deployment
 
-```bash
-npm run dev          # Start development server (frontend + backend)
-npm run build        # Build both frontend and backend
-npm run build:client # Build frontend only
-npm run build:api    # Build API server only
-npm run start        # Start production server
-npm run db:push      # Push database schema
-npm run seed         # Seed development database
-```
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions for:
+- ✅ Render (recommended)
+- Railway
+- Fly.io
+- Vercel
 
-## 🌐 API Endpoints
+**Quick Deploy to Render**:
+1. Push code to GitHub
+2. Connect repository to Render
+3. Render auto-detects `render.yaml`
+4. Add environment variables
+5. Deploy! 🎉
 
-### Public Routes
-- `GET /api/health` - Health check endpoint
-- `GET /api/public/categories` - List all device categories
-- `GET /api/public/catalog` - Get public device catalog
+## API Routes
 
-### Authentication
-- `POST /api/auth/register` - Register new user and company
-- `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
-- `GET /api/auth/me` - Get current user
-- `POST /api/auth/forgot-password` - Request password reset
-- `POST /api/auth/reset-password` - Reset password
+### Device Management
+- `GET /api/device-categories` - List all categories
+- `GET /api/device-models` - List all device models
+- `GET /api/device-variants/:id` - Get variant details
+
+### Orders
+- `POST /api/orders` - Create new order
+- `GET /api/orders/:id` - Get order details
+- `POST /api/orders/:id/generate-label` - Generate shipping label
+- `POST /api/orders/:id/void-label` - Void shipping label
+
+### Email
+- `POST /api/send-email` - Send transactional email
+- `POST /api/orders/:id/send-condition-email` - Send device condition notification
+
+### IMEI Validation
+- `POST /api/check-esn` - Validate device IMEI/ESN
+
+### Webhooks
+- `POST /api/webhook/shipstation` - ShipStation webhook handler
+
+## Environment Variables
+
+Required variables (see `.env.example`):
 - `DATABASE_URL` - Neon PostgreSQL connection string
 - `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` - Email configuration
 - `SHIPENGINE_KEY` - ShipEngine API key

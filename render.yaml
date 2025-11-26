@@ -34,7 +34,7 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        value: https://buyback-a0f05.web.app,https://secondhandcell.com,https://beta.secondhandcell.com
+        value: https://buyback-a0f05.web.app,https://secondhandcell.com
       - key: APP_FRONTEND_URL
         value: https://buyback-a0f05.web.app
       - key: PORT

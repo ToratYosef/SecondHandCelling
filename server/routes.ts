@@ -1197,10 +1197,21 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
         
         console.log('[POST /api/orders] Guest order created:', order.id, orderNumber);
         
+        // Return full order details for frontend
         res.json({ 
           success: true,
+          order: {
+            id: order.id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            total: order.total,
+            currency: order.currency,
+            createdAt: order.createdAt,
+          },
           orderId: order.id,
           orderNumber: order.orderNumber,
+          shipment: null, // No shipment created yet for guest orders
+          labelUrl: null, // No label yet
           message: 'Order submitted successfully'
         });
         return;
@@ -1302,7 +1313,36 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
     }
   });
 
-  // Get order by number
+  // Get order by number (public - for order tracking)
+  app.get("/api/orders/by-number/:orderNumber", async (req, res) => {
+    try {
+      console.log('[GET /api/orders/by-number] Order number:', req.params.orderNumber);
+      
+      const order = await storage.getOrderByNumber(req.params.orderNumber);
+      if (!order) {
+        console.log('[GET /api/orders/by-number] Order not found');
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const items = await storage.getOrderItems(order.id);
+      const payments = await storage.getPaymentsByOrderId(order.id);
+      const shipments = await storage.getShipmentsByOrderId(order.id);
+
+      console.log('[GET /api/orders/by-number] Order found:', {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        itemsCount: items.length,
+        shipmentsCount: shipments.length
+      });
+
+      res.json({ ...order, items, payments, shipments });
+    } catch (error: any) {
+      console.error("Get order by number error:", error);
+      res.status(500).json({ error: "Failed to get order" });
+    }
+  });
+
+  // Get order by number (authenticated - for user's own orders)
   app.get("/api/orders/:orderNumber", requireAuth, async (req, res) => {
     try {
       const order = await storage.getOrderByNumber(req.params.orderNumber);
@@ -1317,35 +1357,6 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
       res.json({ ...order, items, payments, shipments });
     } catch (error: any) {
       console.error("Get order error:", error);
-      res.status(500).json({ error: "Failed to get order" });
-    }
-  });
-
-  // Public: Get order by number (limited fields)
-  app.get("/api/orders/by-number/:orderNumber", async (req, res) => {
-    try {
-      const order = await storage.getOrderByNumber(req.params.orderNumber);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      // Only expose minimal fields publicly
-      const items = await storage.getOrderItems(order.id);
-      const safeItems = items.map((i) => ({
-        deviceVariantId: i.deviceVariantId,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
-      }));
-      res.json({
-        id: order.id,
-        orderNumber: order.orderNumber,
-        status: order.status,
-        total: order.total,
-        currency: order.currency,
-        createdAt: order.createdAt,
-        items: safeItems,
-      });
-    } catch (error: any) {
-      console.error("Public get order by number error:", error);
       res.status(500).json({ error: "Failed to get order" });
     }
   });
@@ -2738,46 +2749,6 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
     } catch (error: any) {
       console.error("Quick stats error:", error);
       res.status(500).json({ error: "Failed to get quick stats" });
-    }
-  });
-
-  // ONE-TIME SETUP: Create super admin (remove after first use)
-  app.post("/api/setup-admin", async (req, res) => {
-    try {
-      const { setupKey } = req.body;
-      
-      // Secret key to prevent unauthorized admin creation
-      if (setupKey !== process.env.SETUP_ADMIN_KEY && setupKey !== "shc-setup-2024") {
-        return res.status(403).json({ error: "Invalid setup key" });
-      }
-
-      // Check if admin already exists
-      const existingAdmin = await storage.getUserByEmail("admin@secondhandcell.com");
-      if (existingAdmin) {
-        return res.json({ message: "Admin already exists", email: "admin@secondhandcell.com" });
-      }
-
-      // Create admin user
-      const adminPassword = await bcrypt.hash("Admin123!", 10);
-      const adminUser = await storage.createUser({
-        name: "Admin User",
-        email: "admin@secondhandcell.com",
-        passwordHash: adminPassword,
-        role: "super_admin",
-        phone: "+1-555-0100",
-        isActive: true,
-      });
-
-      res.json({ 
-        success: true, 
-        message: "Admin created successfully",
-        email: "admin@secondhandcell.com",
-        password: "Admin123!",
-        userId: adminUser.id
-      });
-    } catch (error: any) {
-      console.error("Setup admin error:", error);
-      res.status(500).json({ error: "Failed to create admin: " + error.message });
     }
   });
 
