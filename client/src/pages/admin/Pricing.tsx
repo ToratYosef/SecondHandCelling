@@ -1,18 +1,17 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Upload, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, Download, CheckCircle, AlertCircle } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { useState } from "react";
 
 export default function AdminPricing() {
-  const [xmlContent, setXmlContent] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{
+  const [xmlUrl, setXmlUrl] = useState("https://secondhandcell.com/feeds/NewFeed.xml");
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
     success: boolean;
     message: string;
     details?: {
@@ -24,40 +23,26 @@ export default function AdminPricing() {
     };
   } | null>(null);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setXmlContent(content);
-    };
-    reader.readAsText(file);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!xmlContent.trim()) {
-      setUploadResult({
+  const handleImport = async () => {
+    if (!xmlUrl.trim()) {
+      setImportResult({
         success: false,
-        message: "Please provide XML content",
+        message: "Please provide a valid XML URL",
       });
       return;
     }
 
-    setIsUploading(true);
-    setUploadResult(null);
+    setIsImporting(true);
+    setImportResult(null);
 
     try {
-      const response = await fetch(getApiUrl("/api/admin/pricing/import-xml"), {
+      const response = await fetch(getApiUrl("/api/admin/pricing/import-from-url"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ xml: xmlContent }),
+        body: JSON.stringify({ url: xmlUrl }),
       });
 
       const data = await response.json();
@@ -66,88 +51,92 @@ export default function AdminPricing() {
         throw new Error(data.error || "Failed to import XML");
       }
 
-      setUploadResult({
+      setImportResult({
         success: true,
         message: "XML imported successfully!",
         details: data,
       });
-      
-      // Clear the textarea after successful upload
-      setXmlContent("");
     } catch (error: any) {
-      setUploadResult({
+      setImportResult({
         success: false,
         message: error.message || "Failed to import XML",
       });
     } finally {
-      setIsUploading(false);
+      setIsImporting(false);
     }
   };
 
   return (
     <AdminLayout>
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-6 max-w-4xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Pricing Management</h1>
           <p className="text-muted-foreground mt-2">
-            Upload XML feed to update device models, variants, and pricing tiers
+            Import device models and pricing from XML feed
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Import XML Feed</CardTitle>
+            <CardTitle>Import from XML URL</CardTitle>
             <CardDescription>
-              Paste XML content or upload an XML file. The system will automatically parse models,
-              create variants for different storage/carrier combinations, and set up pricing tiers.
+              Fetch and import device models and pricing from an XML feed URL
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="file-upload">Upload XML File (Optional)</Label>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="xml-url">XML Feed URL</Label>
                 <Input
-                  id="file-upload"
-                  type="file"
-                  accept=".xml,text/xml,application/xml"
-                  onChange={handleFileUpload}
-                  className="cursor-pointer"
+                  id="xml-url"
+                  type="url"
+                  placeholder="https://example.com/feed.xml"
+                  value={xmlUrl}
+                  onChange={(e) => setXmlUrl(e.target.value)}
+                  className="mt-2"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="xml-content">XML Content</Label>
-                <Textarea
-                  id="xml-content"
-                  placeholder="Paste your XML content here or use the file upload above..."
-                  value={xmlContent}
-                  onChange={(e) => setXmlContent(e.target.value)}
-                  className="font-mono text-sm min-h-[400px]"
-                />
-              </div>
+              <Button
+                onClick={handleImport}
+                disabled={isImporting || !xmlUrl.trim()}
+                className="w-full"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Import from URL
+                  </>
+                )}
+              </Button>
 
-              {uploadResult && (
-                <Alert variant={uploadResult.success ? "default" : "destructive"}>
+              {importResult && (
+                <Alert variant={importResult.success ? "default" : "destructive"}>
                   <div className="flex items-start gap-3">
-                    {uploadResult.success ? (
+                    {importResult.success ? (
                       <CheckCircle className="h-5 w-5 mt-0.5 text-green-600" />
                     ) : (
                       <AlertCircle className="h-5 w-5 mt-0.5" />
                     )}
                     <div className="flex-1">
                       <AlertDescription>
-                        <div className="font-semibold mb-2">{uploadResult.message}</div>
-                        {uploadResult.details && (
+                        <div className="font-semibold mb-2">{importResult.message}</div>
+                        {importResult.details && (
                           <div className="space-y-1 text-sm">
-                            <div>Models Created: {uploadResult.details.modelsCreated}</div>
-                            <div>Models Updated: {uploadResult.details.modelsUpdated}</div>
-                            <div>Variants Created: {uploadResult.details.variantsCreated}</div>
-                            <div>Price Tiers Created: {uploadResult.details.priceTiersCreated}</div>
-                            {uploadResult.details.errors.length > 0 && (
+                            <div>Models Created: {importResult.details.modelsCreated}</div>
+                            <div>Models Updated: {importResult.details.modelsUpdated}</div>
+                            <div>Variants Created: {importResult.details.variantsCreated}</div>
+                            <div>Price Tiers Created: {importResult.details.priceTiersCreated}</div>
+                            {importResult.details.errors.length > 0 && (
                               <div className="mt-2">
                                 <div className="font-semibold">Errors:</div>
                                 <ul className="list-disc list-inside">
-                                  {uploadResult.details.errors.map((error, idx) => (
+                                  {importResult.details.errors.map((error, idx) => (
                                     <li key={idx}>{error}</li>
                                   ))}
                                 </ul>
@@ -160,34 +149,7 @@ export default function AdminPricing() {
                   </div>
                 </Alert>
               )}
-
-              <div className="flex gap-3">
-                <Button type="submit" disabled={isUploading || !xmlContent.trim()}>
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Importing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Import XML
-                    </>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setXmlContent("");
-                    setUploadResult(null);
-                  }}
-                  disabled={isUploading}
-                >
-                  Clear
-                </Button>
-              </div>
-            </form>
+            </div>
           </CardContent>
         </Card>
 

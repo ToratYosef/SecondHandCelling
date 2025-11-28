@@ -4,6 +4,33 @@ import { storage } from '../storage';
 export function createAdminPricingRouter() {
   const router = Router();
 
+  // Import XML feed from URL
+  router.post('/import-from-url', async (req: Request, res: Response) => {
+    try {
+      const { url } = req.body;
+
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: 'URL is required' });
+      }
+
+      // Fetch the XML from the URL
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch XML: ${response.statusText}`);
+      }
+
+      const xml = await response.text();
+      const result = await importXmlFeed(xml);
+      return res.json(result);
+    } catch (error: any) {
+      console.error('Error importing XML from URL:', error);
+      return res.status(500).json({ 
+        error: 'Failed to import XML from URL', 
+        message: error.message 
+      });
+    }
+  });
+
   // Import XML feed to update models, variants, and pricing
   router.post('/import-xml', async (req: Request, res: Response) => {
     try {

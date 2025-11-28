@@ -210,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", createLabelsRouter());
   app.use("/api", createOrdersRouter());
   app.use("/api", createWebhookRouter());
-  app.use("/api/admin/pricing", createAdminPricingRouter());
+  app.use("/api/admin/pricing", requireAdmin, createAdminPricingRouter());
 
   // ==================== HEALTH CHECK ====================
   
@@ -221,22 +221,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       service: "SecondHandCell API",
       version: "1.0.0"
     });
-  });
-
-  // Admin quick stats
-  app.get("/api/admin/quick-stats", async (req, res) => {
-    try {
-      // Return basic stats - expand this later with real data
-      const stats = {
-        todayOrders: 0,
-        pending: 0,
-        needsPrinting: 0,
-      };
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching quick stats:", error);
-      res.status(500).json({ error: "Failed to fetch stats" });
-    }
   });
 
   // ==================== PUBLIC API ROUTES (No Auth Required) ====================
