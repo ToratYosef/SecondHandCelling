@@ -33,6 +33,7 @@ import AccountSettings from "@/pages/account/Settings";
 // Admin Pages (disabled view)
 import AdminDisabled from "@/pages/admin/Disabled";
 import AdminOrders from "@/pages/admin/Orders";
+import AdminPricing from "@/pages/admin/Pricing";
 
 import NotFound from "@/pages/not-found";
 
@@ -79,7 +80,7 @@ function Router() {
       <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/admin/inspections" component={AdminDisabled} />
       <Route path="/admin/inspections/:orderNumber" component={AdminDisabled} />
-      <Route path="/admin/pricing" component={AdminDisabled} />
+      <Route path="/admin/pricing" component={AdminPricing} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

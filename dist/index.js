@@ -463,6 +463,22 @@ var init_shipengine = __esm({
        */
       async createLabel(params) {
         try {
+          const normalizeState = (state) => {
+            const stateMap = {
+              "new york": "NY",
+              "california": "CA",
+              "texas": "TX",
+              "florida": "FL",
+              "illinois": "IL",
+              "pennsylvania": "PA",
+              "ohio": "OH",
+              "georgia": "GA",
+              "north carolina": "NC",
+              "michigan": "MI"
+            };
+            const lower = state.toLowerCase().trim();
+            return stateMap[lower] || state.toUpperCase().substring(0, 2);
+          };
           const shipFrom = {
             name: process.env.SHIPENGINE_FROM_NAME || "SHC",
             phone: process.env.SHIPENGINE_FROM_PHONE || "",
@@ -479,7 +495,7 @@ var init_shipengine = __esm({
             addressLine1: params.shipTo.street1,
             addressLine2: params.shipTo.street2,
             cityLocality: params.shipTo.city,
-            stateProvince: params.shipTo.state,
+            stateProvince: normalizeState(params.shipTo.state),
             postalCode: params.shipTo.postalCode,
             countryCode: params.shipTo.country || "US"
           };
@@ -521,9 +537,16 @@ var init_shipengine = __esm({
           console.error("[ShipEngine] Error creating label:", {
             message: error.message,
             response: error.response?.data,
-            status: error.response?.status
+            status: error.response?.status,
+            errors: error.response?.data?.errors
           });
-          throw new Error(`ShipEngine API error: ${error.response?.data?.message || error.message}`);
+          if (error.response?.data?.errors) {
+            error.response.data.errors.forEach((err, idx) => {
+              console.error(`[ShipEngine] Error ${idx + 1}:`, err);
+            });
+          }
+          const errorMsg = error.response?.data?.errors?.[0]?.message || error.response?.data?.message || error.message;
+          throw new Error(`ShipEngine API error: ${errorMsg}`);
         }
       }
       /**
@@ -1382,6 +1405,10 @@ var DatabaseStorage = class {
     const [model] = await db.insert(deviceModels).values(insertModel).returning();
     return model;
   }
+  async updateDeviceModel(id, updates) {
+    const [model] = await db.update(deviceModels).set(updates).where(eq(deviceModels.id, id)).returning();
+    return model || void 0;
+  }
   // Device Variant methods
   async getDeviceVariant(id) {
     const [variant] = await db.select().from(deviceVariants).where(eq(deviceVariants.id, id));
@@ -1510,11 +1537,13 @@ var DatabaseStorage = class {
     return address || void 0;
   }
   async getNextOrderNumber() {
-    const result = await db.select({ orderNumber: orders.orderNumber }).from(orders).orderBy(desc(orders.createdAt)).limit(1);
+    const result = await db.select({ orderNumber: orders.orderNumber }).from(orders).where(sql3`${orders.orderNumber} LIKE 'SHC-%'`).orderBy(desc(orders.orderNumber));
     let nextNum = 1;
-    if (result.length && result[0].orderNumber?.startsWith("SHC-")) {
-      const num = parseInt(result[0].orderNumber.replace("SHC-", ""), 10);
-      if (!isNaN(num)) nextNum = num + 1;
+    if (result.length > 0) {
+      const numbers = result.map((r) => parseInt(r.orderNumber?.replace("SHC-", "") || "0", 10)).filter((n) => !isNaN(n));
+      if (numbers.length > 0) {
+        nextNum = Math.max(...numbers) + 1;
+      }
     }
     return `SHC-${nextNum}`;
   }
@@ -1645,8 +1674,8 @@ init_email();
 init_emailTemplates();
 import { Router } from "express";
 function createEmailsRouter() {
-  const router2 = Router();
-  router2.post("/send-email", async (req, res) => {
+  const router = Router();
+  router.post("/send-email", async (req, res) => {
     try {
       const { to, bcc, subject, html } = req.body || {};
       if (!to || !subject || !html) {
@@ -1664,7 +1693,7 @@ function createEmailsRouter() {
       res.status(500).json({ error: "Failed to send email." });
     }
   });
-  router2.post("/test-emails", async (req, res) => {
+  router.post("/test-emails", async (req, res) => {
     const { email, emailTypes } = req.body || {};
     if (!email || !emailTypes || !Array.isArray(emailTypes)) {
       return res.status(400).json({ error: "Email and emailTypes array are required." });
@@ -1708,7 +1737,7 @@ function createEmailsRouter() {
       res.status(500).json({ error: `Failed to send test emails: ${error.message}` });
     }
   });
-  router2.post("/orders/:id/send-condition-email", async (req, res) => {
+  router.post("/orders/:id/send-condition-email", async (req, res) => {
     try {
       const { reason, notes, label: labelText } = req.body || {};
       const orderId = req.params.id;
@@ -1718,7 +1747,7 @@ function createEmailsRouter() {
       res.status(500).json({ error: "Failed to send condition email." });
     }
   });
-  router2.post("/orders/:id/fmi-cleared", async (req, res) => {
+  router.post("/orders/:id/fmi-cleared", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "FMI status updated successfully." });
@@ -1727,7 +1756,7 @@ function createEmailsRouter() {
       res.status(500).json({ error: "Failed to clear FMI status" });
     }
   });
-  return router2;
+  return router;
 }
 
 // server/routes/imei.ts
@@ -1863,8 +1892,8 @@ function isSamsungDeviceHint(...values) {
 init_email();
 init_emailTemplates();
 function createImeiRouter() {
-  const router2 = Router2();
-  router2.post("/check-esn", async (req, res) => {
+  const router = Router2();
+  router.post("/check-esn", async (req, res) => {
     const {
       imei,
       orderId,
@@ -1978,7 +2007,7 @@ function createImeiRouter() {
       res.status(500).json({ error: "Failed to perform IMEI check." });
     }
   });
-  return router2;
+  return router;
 }
 
 // server/routes/labels.ts
@@ -2058,8 +2087,8 @@ var SHC_RECEIVING_ADDRESS = {
   country: "US"
 };
 function createLabelsRouter() {
-  const router2 = Router3();
-  router2.post("/generate-label/:id", async (req, res) => {
+  const router = Router3();
+  router.post("/generate-label/:id", async (req, res) => {
     try {
       const orderId = req.params.id;
       const order = {
@@ -2158,7 +2187,7 @@ function createLabelsRouter() {
       res.status(500).json({ error: "Failed to generate label" });
     }
   });
-  router2.post("/orders/:id/return-label", async (req, res) => {
+  router.post("/orders/:id/return-label", async (req, res) => {
     try {
       const orderId = req.params.id;
       const order = {
@@ -2211,35 +2240,35 @@ function createLabelsRouter() {
       res.status(500).json({ error: "Failed to generate return label" });
     }
   });
-  return router2;
+  return router;
 }
 
 // server/routes/orders.ts
 import { Router as Router4 } from "express";
 import bcrypt from "bcrypt";
 import { z } from "zod";
-router.get("/label/:orderNumber", async (req, res) => {
-  try {
-    const { orderNumber } = req.params;
-    const order = await storage.getOrderByNumber(orderNumber);
-    if (!order) return res.status(404).send("Order not found");
-    const shipments2 = await storage.getShipmentsByOrderId(order.id);
-    if (!shipments2.length || !shipments2[0].shippingLabelUrl) {
-      return res.status(404).send("No label found for this order");
-    }
-    const { shipEngineService: shipEngineService2 } = (init_shipengine(), __toCommonJS(shipengine_exports));
-    const pdfBuffer = await shipEngineService2.downloadLabelPdf(shipments2[0].shippingLabelUrl);
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=ShippingLabel-${orderNumber}.pdf`);
-    res.send(pdfBuffer);
-  } catch (error) {
-    console.error("Error downloading label PDF:", error);
-    res.status(500).send("Failed to download label PDF");
-  }
-});
 function createOrdersRouter() {
-  const router2 = Router4();
-  router2.post("/fetch-pdf", async (req, res) => {
+  const router = Router4();
+  router.get("/label/:orderNumber", async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      const order = await storage.getOrderByNumber(orderNumber);
+      if (!order) return res.status(404).send("Order not found");
+      const shipments2 = await storage.getShipmentsByOrderId(order.id);
+      if (!shipments2.length || !shipments2[0].shippingLabelUrl) {
+        return res.status(404).send("No label found for this order");
+      }
+      const { shipEngineService: shipEngineService2 } = (init_shipengine(), __toCommonJS(shipengine_exports));
+      const pdfBuffer = await shipEngineService2.downloadLabelPdf(shipments2[0].shippingLabelUrl);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=ShippingLabel-${orderNumber}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error downloading label PDF:", error);
+      res.status(500).send("Failed to download label PDF");
+    }
+  });
+  router.post("/fetch-pdf", async (req, res) => {
     try {
       const { url } = req.body;
       res.json({ message: "PDF fetched successfully" });
@@ -2248,7 +2277,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to fetch PDF" });
     }
   });
-  router2.get("/orders", async (req, res) => {
+  router.get("/orders", async (req, res) => {
     try {
       res.json({ orders: [] });
     } catch (error) {
@@ -2256,7 +2285,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
-  router2.get("/orders/needs-printing", async (req, res) => {
+  router.get("/orders/needs-printing", async (req, res) => {
     try {
       res.json({ orders: [] });
     } catch (error) {
@@ -2264,7 +2293,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
-  router2.post("/orders/needs-printing/bundle", async (req, res) => {
+  router.post("/orders/needs-printing/bundle", async (req, res) => {
     try {
       res.json({ message: "Print bundle created" });
     } catch (error) {
@@ -2272,7 +2301,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to create print bundle" });
     }
   });
-  router2.post("/merge-print", async (req, res) => {
+  router.post("/merge-print", async (req, res) => {
     try {
       const { orderIds } = req.body;
       res.json({ message: "PDFs merged successfully" });
@@ -2281,7 +2310,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to merge PDFs" });
     }
   });
-  router2.get("/merge-print/:orderIds", async (req, res) => {
+  router.get("/merge-print/:orderIds", async (req, res) => {
     try {
       const { orderIds } = req.params;
       res.json({ message: "Merged print generated" });
@@ -2290,7 +2319,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to generate merged print" });
     }
   });
-  router2.get("/orders/:id", async (req, res) => {
+  router.get("/orders/:id", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ order: null });
@@ -2299,7 +2328,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Order not found" });
     }
   });
-  router2.get("/orders/find", async (req, res) => {
+  router.get("/orders/find", async (req, res) => {
     try {
       const { trackingNumber, email, orderId } = req.query;
       res.json({ orders: [] });
@@ -2308,7 +2337,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to find orders" });
     }
   });
-  router2.get("/orders/by-user/:userId", async (req, res) => {
+  router.get("/orders/by-user/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
       res.json({ orders: [] });
@@ -2317,7 +2346,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to fetch user orders" });
     }
   });
-  router2.post("/submit-order", async (req, res) => {
+  router.post("/submit-order", async (req, res) => {
     try {
       const OrderSchema = z.object({
         customerInfo: z.object({
@@ -2357,7 +2386,7 @@ function createOrdersRouter() {
           email: customerInfo.email,
           name: customerInfo.name || customerInfo.email.split("@")[0],
           passwordHash,
-          role: "customer",
+          role: "buyer",
           isActive: true
         });
       }
@@ -2400,8 +2429,8 @@ function createOrdersRouter() {
           price: d.price
         });
         let variants = await storage.getDeviceVariantsByModelId(d.modelId);
-        console.log("[submit-order] Found variants:", variants.map((v) => ({ id: v.id, storage: v.storage, carrier: v.carrier })));
-        let match = variants.find((v) => (!d.storage || v.storage === d.storage) && (!d.carrier || v.carrier === d.carrier)) || variants[0];
+        console.log("[submit-order] Found variants:", variants.map((v) => ({ id: v.id, storage: v.storage })));
+        let match = variants.find((v) => !d.storage || v.storage === d.storage) || variants[0];
         if (!match) {
           console.log("[submit-order] No variant matched; creating variant on the fly");
           const created = await storage.createDeviceVariant({
@@ -2414,7 +2443,7 @@ function createOrdersRouter() {
           match = created;
           variants = [created];
         }
-        console.log("[submit-order] Using variant:", { id: match.id, storage: match.storage, carrier: match.carrier });
+        console.log("[submit-order] Using variant:", { id: match.id, storage: match.storage });
         await storage.createOrderItem({
           orderId: order.id,
           deviceVariantId: match.id,
@@ -2500,7 +2529,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to submit order", details: error.message });
     }
   });
-  router2.get("/promo-codes/:code", async (req, res) => {
+  router.get("/promo-codes/:code", async (req, res) => {
     try {
       const { code } = req.params;
       res.json({ valid: false });
@@ -2509,7 +2538,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Promo code not found" });
     }
   });
-  router2.post("/generate-label/:id", async (req, res) => {
+  router.post("/generate-label/:id", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "Label generated successfully" });
@@ -2518,7 +2547,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to generate label" });
     }
   });
-  router2.post("/orders/:id/void-label", async (req, res) => {
+  router.post("/orders/:id/void-label", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "Label voided successfully" });
@@ -2527,7 +2556,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to void label" });
     }
   });
-  router2.get("/packing-slip/:id", async (req, res) => {
+  router.get("/packing-slip/:id", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "Packing slip generated" });
@@ -2536,7 +2565,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to generate packing slip" });
     }
   });
-  router2.get("/print-bundle/:id", async (req, res) => {
+  router.get("/print-bundle/:id", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "Print bundle generated" });
@@ -2545,7 +2574,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to generate print bundle" });
     }
   });
-  router2.post("/repair-label-generated", async (req, res) => {
+  router.post("/repair-label-generated", async (req, res) => {
     try {
       res.json({ processedCount: 0, updatedCount: 0 });
     } catch (error) {
@@ -2553,7 +2582,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Unable to repair label-generated orders" });
     }
   });
-  router2.post("/orders/repair-label-generated", async (req, res) => {
+  router.post("/orders/repair-label-generated", async (req, res) => {
     try {
       res.json({ processedCount: 0, updatedCount: 0 });
     } catch (error) {
@@ -2561,14 +2590,14 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Unable to repair label-generated orders" });
     }
   });
-  return router2;
+  return router;
 }
 
 // server/routes/webhook.ts
 import { Router as Router5 } from "express";
 import crypto2 from "crypto";
 function createWebhookRouter() {
-  const router2 = Router5();
+  const router = Router5();
   const verifyShipStationSignature = (req, res, next) => {
     const signature = req.headers["x-shipstation-signature"];
     const secret = process.env.SHIPSTATION_WEBHOOK_SECRET;
@@ -2594,7 +2623,7 @@ function createWebhookRouter() {
     }
     next();
   };
-  router2.post("/webhook/shipstation", verifyShipStationSignature, async (req, res) => {
+  router.post("/webhook/shipstation", verifyShipStationSignature, async (req, res) => {
     try {
       const event = req.body;
       console.log("Received ShipStation webhook event:", event);
@@ -2604,7 +2633,202 @@ function createWebhookRouter() {
       res.status(500).send("Failed to process webhook");
     }
   });
-  return router2;
+  return router;
+}
+
+// server/routes/admin-pricing.ts
+import { Router as Router6 } from "express";
+function createAdminPricingRouter() {
+  const router = Router6();
+  router.post("/import-xml", async (req, res) => {
+    try {
+      const { xml } = req.body;
+      if (!xml || typeof xml !== "string") {
+        return res.status(400).json({ error: "XML content is required" });
+      }
+      const result = await importXmlFeed(xml);
+      return res.json(result);
+    } catch (error) {
+      console.error("Error importing XML:", error);
+      return res.status(500).json({
+        error: "Failed to import XML",
+        message: error.message
+      });
+    }
+  });
+  return router;
+}
+function extractTagValue(block, tag) {
+  const regex = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, "i");
+  const match = regex.exec(block);
+  return match ? match[1].trim() : void 0;
+}
+function parseXmlModels(xml) {
+  const models = [];
+  const modelRegex = /<model>([\s\S]*?)<\/model>/gi;
+  let match;
+  while ((match = modelRegex.exec(xml)) !== null) {
+    const block = match[1];
+    const parentDevice = extractTagValue(block, "parentDevice") || "";
+    const modelID = extractTagValue(block, "modelID") || "";
+    const name = extractTagValue(block, "name") || "";
+    const brand = extractTagValue(block, "brand") || parentDevice;
+    const slug = extractTagValue(block, "slug") || "";
+    const imageUrl = extractTagValue(block, "imageUrl") || "";
+    const deeplink = extractTagValue(block, "deeplink");
+    const prices = [];
+    const pricesRegex = /<prices>([\s\S]*?)<\/prices>/gi;
+    let priceMatch;
+    while ((priceMatch = pricesRegex.exec(block)) !== null) {
+      const priceBlock = priceMatch[1];
+      const storageSize = extractTagValue(priceBlock, "storageSize") || "";
+      const carriers = {};
+      const carrierNames = ["att", "verizon", "tmobile", "unlocked"];
+      for (const carrierName of carrierNames) {
+        const carrierRegex = new RegExp(`<${carrierName}>([\\s\\S]*?)<\\/${carrierName}>`, "i");
+        const carrierMatch = carrierRegex.exec(priceBlock);
+        if (carrierMatch) {
+          const carrierBlock = carrierMatch[1];
+          carriers[carrierName] = {
+            flawless: parseFloat(extractTagValue(carrierBlock, "flawless") || "0"),
+            good: parseFloat(extractTagValue(carrierBlock, "good") || "0"),
+            fair: parseFloat(extractTagValue(carrierBlock, "fair") || "0"),
+            broken: parseFloat(extractTagValue(carrierBlock, "broken") || "0")
+          };
+        }
+      }
+      if (storageSize && Object.keys(carriers).length > 0) {
+        prices.push({ storageSize, carriers });
+      }
+    }
+    if (modelID && name && slug) {
+      models.push({
+        parentDevice,
+        modelID,
+        name,
+        brand,
+        slug,
+        imageUrl,
+        deeplink,
+        prices
+      });
+    }
+  }
+  return models;
+}
+function slugify(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").replace(/--+/g, "-");
+}
+function formatBrand(brand) {
+  if (!brand) return brand;
+  return brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
+}
+function normalizeCarrier(carrier) {
+  const mapping = {
+    "att": "AT&T",
+    "verizon": "Verizon",
+    "tmobile": "T-Mobile",
+    "unlocked": "Unlocked"
+  };
+  return mapping[carrier.toLowerCase()] || carrier;
+}
+function normalizeCondition(condition) {
+  const mapping = {
+    "flawless": "Flawless",
+    "good": "Good",
+    "fair": "Fair",
+    "broken": "Broken"
+  };
+  return mapping[condition.toLowerCase()] || condition;
+}
+async function importXmlFeed(xml) {
+  const models = parseXmlModels(xml);
+  const errors = [];
+  let modelsCreated = 0;
+  let modelsUpdated = 0;
+  let variantsCreated = 0;
+  let priceTiersCreated = 0;
+  let category = await storage.getCategoryBySlug("smartphones");
+  if (!category) {
+    category = await storage.createCategory({
+      name: "Smartphones",
+      slug: "smartphones"
+    });
+  }
+  for (const model of models) {
+    try {
+      const modelSlug = slugify(`${model.brand}-${model.slug}`);
+      let deviceModel = await storage.getDeviceModelBySlug(modelSlug);
+      if (!deviceModel) {
+        deviceModel = await storage.createDeviceModel({
+          brand: formatBrand(model.brand),
+          name: model.name.trim(),
+          marketingName: model.name.trim(),
+          sku: `${model.brand}-${model.modelID}`.toUpperCase().replace(/[^A-Z0-9]+/g, "-"),
+          slug: modelSlug,
+          categoryId: category.id,
+          imageUrl: model.imageUrl,
+          description: model.deeplink ? `Deeplink: ${model.deeplink}` : "",
+          isActive: true
+        });
+        modelsCreated++;
+      } else {
+        await storage.updateDeviceModel(deviceModel.id, {
+          imageUrl: model.imageUrl,
+          description: model.deeplink ? `Deeplink: ${model.deeplink}` : deviceModel.description
+        });
+        modelsUpdated++;
+      }
+      for (const priceData of model.prices) {
+        const storageValue = parseInt(priceData.storageSize.replace(/[^0-9]/g, "")) || 0;
+        for (const [carrierKey, conditions] of Object.entries(priceData.carriers)) {
+          const carrierName = normalizeCarrier(carrierKey);
+          const existingVariants = await storage.getDeviceVariantsByModelId(deviceModel.id);
+          let variant = existingVariants.find(
+            (v) => v.storage === priceData.storageSize && v.carrier === carrierName
+          );
+          if (!variant) {
+            variant = await storage.createDeviceVariant({
+              deviceModelId: deviceModel.id,
+              storage: priceData.storageSize,
+              color: "Various",
+              carrier: carrierName,
+              conditionGrade: "A"
+            });
+            variantsCreated++;
+          }
+          for (const [conditionKey, price] of Object.entries(conditions)) {
+            const conditionName = normalizeCondition(conditionKey);
+            if (price > 0) {
+              try {
+                await storage.createPriceTier({
+                  deviceVariantId: variant.id,
+                  condition: conditionName,
+                  minQuantity: 1,
+                  maxQuantity: null,
+                  pricePerUnit: price.toString(),
+                  currency: "USD",
+                  effectiveFrom: /* @__PURE__ */ new Date(),
+                  effectiveTo: null
+                });
+                priceTiersCreated++;
+              } catch (error) {
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      errors.push(`Error processing model ${model.name}: ${error.message}`);
+    }
+  }
+  return {
+    modelsCreated,
+    modelsUpdated,
+    variantsCreated,
+    priceTiersCreated,
+    errors
+  };
 }
 
 // server/routes.ts
@@ -2625,7 +2849,7 @@ async function verifyJwt(token) {
     return null;
   }
 }
-var slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+var slugify2 = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 var requireAuth = (req, res, next) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });
@@ -2750,6 +2974,7 @@ async function registerRoutes(app2) {
   app2.use("/api", createLabelsRouter());
   app2.use("/api", createOrdersRouter());
   app2.use("/api", createWebhookRouter());
+  app2.use("/api/admin/pricing", createAdminPricingRouter());
   app2.get("/api/health", (req, res) => {
     res.json({
       status: "ok",
@@ -3800,7 +4025,7 @@ Notes: ${notes2}` : ""}`;
       }
       if (!categoryId) {
         const fallbackName = data.categoryName || "smartphones";
-        const fallbackSlug = slugify(fallbackName);
+        const fallbackSlug = slugify2(fallbackName);
         const existing = await storage.getCategoryBySlug(fallbackSlug);
         if (existing) {
           categoryId = existing.id;
@@ -3812,7 +4037,7 @@ Notes: ${notes2}` : ""}`;
           categoryId = created.id;
         }
       }
-      const baseSlug = slugify(`${data.brand}-${data.name}-${data.sku}`);
+      const baseSlug = slugify2(`${data.brand}-${data.name}-${data.sku}`);
       const model = await storage.createDeviceModel({
         brand: data.brand,
         name: data.name,
@@ -3953,7 +4178,7 @@ Notes: ${notes2}` : ""}`;
       const data = schema.parse(req.body);
       const created = [];
       for (const device of data.devices) {
-        const categorySlug = device.categorySlug || slugify(device.categoryName || "smartphones");
+        const categorySlug = device.categorySlug || slugify2(device.categoryName || "smartphones");
         let categoryId;
         const existingCategory = await storage.getCategoryBySlug(categorySlug);
         if (existingCategory) {
@@ -3970,7 +4195,7 @@ Notes: ${notes2}` : ""}`;
           name: device.name,
           marketingName: device.marketingName || device.name,
           sku: device.sku,
-          slug: slugify(`${device.brand}-${device.name}-${device.sku}`),
+          slug: slugify2(`${device.brand}-${device.name}-${device.sku}`),
           categoryId,
           isActive: true
         });

@@ -425,15 +425,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextOrderNumber(): Promise<string> {
-    // Get the highest order number
+    // Get ALL SHC order numbers and find the highest
     const result = await db.select({ orderNumber: schema.orders.orderNumber })
       .from(schema.orders)
-      .orderBy(desc(schema.orders.createdAt))
-      .limit(1);
+      .where(sql`${schema.orders.orderNumber} LIKE 'SHC-%'`)
+      .orderBy(desc(schema.orders.orderNumber));
+    
     let nextNum = 1;
-    if (result.length && result[0].orderNumber?.startsWith('SHC-')) {
-      const num = parseInt(result[0].orderNumber.replace('SHC-', ''), 10);
-      if (!isNaN(num)) nextNum = num + 1;
+    if (result.length > 0) {
+      // Parse all SHC numbers and find the maximum
+      const numbers = result
+        .map(r => parseInt(r.orderNumber?.replace('SHC-', '') || '0', 10))
+        .filter(n => !isNaN(n));
+      
+      if (numbers.length > 0) {
+        nextNum = Math.max(...numbers) + 1;
+      }
     }
     return `SHC-${nextNum}`;
   }

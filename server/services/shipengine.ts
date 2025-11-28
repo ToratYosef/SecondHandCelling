@@ -134,6 +134,24 @@ export class ShipEngineService {
     weight?: number; // in ounces
   }): Promise<CreateLabelResponse> {
     try {
+      // Normalize state to 2-letter abbreviation
+      const normalizeState = (state: string): string => {
+        const stateMap: { [key: string]: string } = {
+          'new york': 'NY',
+          'california': 'CA',
+          'texas': 'TX',
+          'florida': 'FL',
+          'illinois': 'IL',
+          'pennsylvania': 'PA',
+          'ohio': 'OH',
+          'georgia': 'GA',
+          'north carolina': 'NC',
+          'michigan': 'MI',
+        };
+        const lower = state.toLowerCase().trim();
+        return stateMap[lower] || state.toUpperCase().substring(0, 2);
+      };
+
       // Build ship_from address from environment variables
       const shipFrom: ShipToAddress = {
         name: process.env.SHIPENGINE_FROM_NAME || 'SHC',
@@ -153,7 +171,7 @@ export class ShipEngineService {
         addressLine1: params.shipTo.street1,
         addressLine2: params.shipTo.street2,
         cityLocality: params.shipTo.city,
-        stateProvince: params.shipTo.state,
+        stateProvince: normalizeState(params.shipTo.state),
         postalCode: params.shipTo.postalCode,
         countryCode: params.shipTo.country || 'US',
       };
@@ -203,8 +221,18 @@ export class ShipEngineService {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
+        errors: error.response?.data?.errors,
       });
-      throw new Error(`ShipEngine API error: ${error.response?.data?.message || error.message}`);
+      
+      // Log detailed error information if available
+      if (error.response?.data?.errors) {
+        error.response.data.errors.forEach((err: any, idx: number) => {
+          console.error(`[ShipEngine] Error ${idx + 1}:`, err);
+        });
+      }
+      
+      const errorMsg = error.response?.data?.errors?.[0]?.message || error.response?.data?.message || error.message;
+      throw new Error(`ShipEngine API error: ${errorMsg}`);
     }
   }
 
