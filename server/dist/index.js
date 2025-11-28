@@ -4,20 +4,20 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// server/index.ts
+// index.ts
 import express2 from "express";
 
-// server/routes.ts
+// routes.ts
 import { createServer } from "http";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 
-// server/db.ts
+// db.ts
 import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
-// shared/schema.ts
+// ../shared/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
   announcements: () => announcements,
@@ -706,14 +706,14 @@ var insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true
 });
 
-// server/db.ts
+// db.ts
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 var sql2 = neon(process.env.DATABASE_URL);
 var db = drizzle(sql2, { schema: schema_exports });
 
-// server/storage.ts
+// storage.ts
 import { eq, and, desc, sql as sql3 } from "drizzle-orm";
 var DatabaseStorage = class {
   // User methods
@@ -1039,11 +1039,11 @@ var DatabaseStorage = class {
 };
 var storage = new DatabaseStorage();
 
-// server/routes.ts
+// routes.ts
 import bcrypt from "bcrypt";
 import { z } from "zod";
 
-// server/services/email.ts
+// services/email.ts
 import nodemailer from "nodemailer";
 var transporter = null;
 function getEmailTransporter() {
@@ -1078,10 +1078,10 @@ async function sendEmail(mailOptions) {
   }
 }
 
-// server/routes/emails.ts
+// routes/emails.ts
 import { Router } from "express";
 
-// server/helpers/emailTemplates.ts
+// helpers/emailTemplates.ts
 var EMAIL_LOGO_URL = "https://raw.githubusercontent.com/ToratYosef/BuyBacking/refs/heads/main/assets/logo.png";
 var TRUSTPILOT_REVIEW_LINK = "https://www.trustpilot.com/evaluate/secondhandcell.com";
 var TRUSTPILOT_STARS_IMAGE_URL = "https://cdn.trustpilot.net/brand-assets/4.1.0/stars/stars-5.png";
@@ -1403,7 +1403,7 @@ function replaceEmailVariables(template, variables) {
   return result;
 }
 
-// server/routes/emails.ts
+// routes/emails.ts
 function createEmailsRouter() {
   const router = Router();
   router.post("/send-email", async (req, res) => {
@@ -1490,10 +1490,10 @@ function createEmailsRouter() {
   return router;
 }
 
-// server/routes/imei.ts
+// routes/imei.ts
 import { Router as Router2 } from "express";
 
-// server/services/phonecheck.ts
+// services/phonecheck.ts
 import axios from "axios";
 var PHONECHECK_BASE_URL = "https://clientapiv2.phonecheck.com";
 var PHONECHECK_SAMSUNG_BASE_URL = "https://api.phonecheck.com";
@@ -1619,7 +1619,7 @@ function isSamsungDeviceHint(...values) {
   return values.some((val) => val && samsungRegex.test(String(val)));
 }
 
-// server/routes/imei.ts
+// routes/imei.ts
 function createImeiRouter() {
   const router = Router2();
   router.post("/check-esn", async (req, res) => {
@@ -1739,10 +1739,10 @@ function createImeiRouter() {
   return router;
 }
 
-// server/routes/labels.ts
+// routes/labels.ts
 import { Router as Router3 } from "express";
 
-// server/services/shipstation.ts
+// services/shipstation.ts
 import axios2 from "axios";
 function getShipStationCredentials() {
   const key = process.env.SHIPSTATION_KEY;
@@ -1801,7 +1801,7 @@ async function createShipStationLabel(fromAddress, toAddress, carrierCode, servi
   }
 }
 
-// server/routes/labels.ts
+// routes/labels.ts
 var SHC_RECEIVING_ADDRESS = {
   name: "SHC",
   company: "SecondHandCell",
@@ -1970,7 +1970,7 @@ function createLabelsRouter() {
   return router;
 }
 
-// server/routes/orders.ts
+// routes/orders.ts
 import { Router as Router4 } from "express";
 function createOrdersRouter() {
   const router = Router4();
@@ -2125,7 +2125,7 @@ function createOrdersRouter() {
   return router;
 }
 
-// server/routes/webhook.ts
+// routes/webhook.ts
 import { Router as Router5 } from "express";
 import crypto2 from "crypto";
 function createWebhookRouter() {
@@ -2168,7 +2168,7 @@ function createWebhookRouter() {
   return router;
 }
 
-// server/routes.ts
+// routes.ts
 var slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 var requireAuth = (req, res, next) => {
   if (!req.session.userId) {
@@ -3086,9 +3086,6 @@ Notes: ${notes2}` : ""}`;
       if (!billingAddressId) {
         return res.status(400).json({ error: "Billing address is required" });
       }
-      if (paymentMethod === "card" && !stripe) {
-        return res.status(503).json({ error: "Card payment is not available. Please select another payment method." });
-      }
       const cart = await storage.getCartByUserId(userId);
       if (!cart) {
         return res.status(400).json({ error: "Cart not found" });
@@ -3187,91 +3184,6 @@ Notes: ${notes2}` : ""}`;
     } catch (error) {
       console.error("Get order error:", error);
       res.status(500).json({ error: "Failed to get order" });
-    }
-  });
-  app2.post("/api/create-payment-intent", requireAuth, async (req, res) => {
-    try {
-      if (!stripe) {
-        return res.status(503).json({ error: "Payment processing is not configured" });
-      }
-      const { amount, orderId } = req.body;
-      if (!orderId) {
-        return res.status(400).json({ error: "Order ID is required" });
-      }
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
-      const hasAccess = companyUsers2.some((cu) => cu.companyId === order.companyId);
-      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
-        return res.status(403).json({ error: "Access denied" });
-      }
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(parseFloat(amount) * 100),
-        // Convert to cents
-        currency: "usd",
-        metadata: {
-          orderId,
-          userId: req.session.userId,
-          orderNumber: order.orderNumber
-        }
-      });
-      await storage.updateOrder(orderId, {
-        notesInternal: `Stripe Payment Intent: ${paymentIntent.id}`
-      });
-      res.json({ clientSecret: paymentIntent.client_secret });
-    } catch (error) {
-      console.error("Create payment intent error:", error);
-      res.status(500).json({ error: "Failed to create payment intent: " + error.message });
-    }
-  });
-  app2.post("/api/confirm-payment", requireAuth, async (req, res) => {
-    try {
-      const { orderId, paymentIntentId } = req.body;
-      if (!orderId || !paymentIntentId) {
-        return res.status(400).json({ error: "Order ID and payment intent ID are required" });
-      }
-      if (!stripe) {
-        return res.status(503).json({ error: "Payment processing is not configured" });
-      }
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
-      const hasAccess = companyUsers2.some((cu) => cu.companyId === order.companyId);
-      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
-        return res.status(403).json({ error: "Access denied" });
-      }
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      if (paymentIntent.metadata.orderId !== orderId) {
-        return res.status(400).json({ error: "Payment intent does not match order" });
-      }
-      if (paymentIntent.status !== "succeeded") {
-        return res.status(400).json({ error: "Payment has not succeeded" });
-      }
-      const orderTotalCents = Math.round(parseFloat(order.total) * 100);
-      if (paymentIntent.amount !== orderTotalCents) {
-        return res.status(400).json({ error: "Payment amount does not match order total" });
-      }
-      await storage.updateOrder(orderId, {
-        status: "processing",
-        paymentStatus: "paid"
-      });
-      await storage.createPayment({
-        orderId,
-        amount: (paymentIntent.amount / 100).toFixed(2),
-        currency: paymentIntent.currency.toUpperCase(),
-        method: "card",
-        status: "paid",
-        stripePaymentIntentId: paymentIntent.id,
-        processedAt: /* @__PURE__ */ new Date()
-      });
-      res.json({ success: true, order });
-    } catch (error) {
-      console.error("Confirm payment error:", error);
-      res.status(500).json({ error: "Failed to confirm payment: " + error.message });
     }
   });
   app2.get("/api/companies/:id", requireAuth, async (req, res) => {
@@ -4355,13 +4267,13 @@ ${message}`,
   return httpServer;
 }
 
-// server/vite.ts
+// vite.ts
 import express from "express";
 import fs from "fs";
 import path2 from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 
-// vite.config.ts
+// ../vite.config.ts
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -4407,7 +4319,7 @@ var vite_config_default = defineConfig({
   }
 });
 
-// server/vite.ts
+// vite.ts
 import { nanoid } from "nanoid";
 var viteLogger = createLogger();
 function log(message, source = "express") {
@@ -4474,7 +4386,7 @@ function serveStatic(app2) {
   });
 }
 
-// server/index.ts
+// index.ts
 var app = express2();
 var allowedOrigins = (process.env.CORS_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean);
 app.set("trust proxy", 1);

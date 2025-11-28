@@ -5,7 +5,6 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
-import Stripe from "stripe";
 import { z } from "zod";
 import { sendEmail } from "./services/email";
 import {
@@ -31,14 +30,6 @@ const slugify = (value: string) =>
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
-
-// Initialize Stripe (only if key is provided)
-let stripe: Stripe | null = null;
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2025-10-29.clover",
-  });
-}
 
 // Session user type
 declare module 'express-session' {
@@ -1230,11 +1221,6 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
         return res.status(400).json({ error: "Billing address is required" });
       }
 
-      // Validate payment method
-      if (paymentMethod === "card" && !stripe) {
-        return res.status(503).json({ error: "Card payment is not available. Please select another payment method." });
-      }
-
       const cart = await storage.getCartByUserId(userId);
       if (!cart) {
         return res.status(400).json({ error: "Cart not found" });
@@ -1359,123 +1345,6 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
     } catch (error: any) {
       console.error("Get order error:", error);
       res.status(500).json({ error: "Failed to get order" });
-    }
-  });
-
-  // ==================== STRIPE PAYMENT ROUTES ====================
-  
-  // Create payment intent
-  app.post("/api/create-payment-intent", requireAuth, async (req, res) => {
-    try {
-      if (!stripe) {
-        return res.status(503).json({ error: "Payment processing is not configured" });
-      }
-
-      const { amount, orderId } = req.body;
-
-      if (!orderId) {
-        return res.status(400).json({ error: "Order ID is required" });
-      }
-
-      // Verify order exists and user has access
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-
-      const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
-      const hasAccess = companyUsers.some((cu) => cu.companyId === order.companyId);
-      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(parseFloat(amount) * 100), // Convert to cents
-        currency: "usd",
-        metadata: { 
-          orderId,
-          userId: req.session.userId!,
-          orderNumber: order.orderNumber,
-        },
-      });
-
-      // Store payment intent ID on order for later verification
-      await storage.updateOrder(orderId, {
-        notesInternal: `Stripe Payment Intent: ${paymentIntent.id}`,
-      });
-
-      res.json({ clientSecret: paymentIntent.client_secret });
-    } catch (error: any) {
-      console.error("Create payment intent error:", error);
-      res.status(500).json({ error: "Failed to create payment intent: " + error.message });
-    }
-  });
-
-  // Confirm payment and update order
-  app.post("/api/confirm-payment", requireAuth, async (req, res) => {
-    try {
-      const { orderId, paymentIntentId } = req.body;
-
-      if (!orderId || !paymentIntentId) {
-        return res.status(400).json({ error: "Order ID and payment intent ID are required" });
-      }
-
-      if (!stripe) {
-        return res.status(503).json({ error: "Payment processing is not configured" });
-      }
-
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-
-      // Verify user has access to this order
-      const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
-      const hasAccess = companyUsers.some((cu) => cu.companyId === order.companyId);
-      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      // Retrieve and validate payment intent from Stripe
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      
-      // Verify payment intent belongs to this order
-      if (paymentIntent.metadata.orderId !== orderId) {
-        return res.status(400).json({ error: "Payment intent does not match order" });
-      }
-
-      // Verify payment succeeded
-      if (paymentIntent.status !== "succeeded") {
-        return res.status(400).json({ error: "Payment has not succeeded" });
-      }
-
-      // Verify amount matches order total (in cents)
-      const orderTotalCents = Math.round(parseFloat(order.total) * 100);
-      if (paymentIntent.amount !== orderTotalCents) {
-        return res.status(400).json({ error: "Payment amount does not match order total" });
-      }
-
-      // Update order status
-      await storage.updateOrder(orderId, {
-        status: "processing",
-        paymentStatus: "paid",
-      });
-
-      // Record payment
-      await storage.createPayment({
-        orderId,
-        amount: (paymentIntent.amount / 100).toFixed(2),
-        currency: paymentIntent.currency.toUpperCase(),
-        method: "card",
-        status: "paid",
-        stripePaymentIntentId: paymentIntent.id,
-        processedAt: new Date(),
-      });
-
-      res.json({ success: true, order });
-    } catch (error: any) {
-      console.error("Confirm payment error:", error);
-      res.status(500).json({ error: "Failed to confirm payment: " + error.message });
     }
   });
 
