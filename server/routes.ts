@@ -210,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", createLabelsRouter());
   app.use("/api", createOrdersRouter());
   app.use("/api", createWebhookRouter());
-  app.use("/api/admin/pricing", requireAdmin, createAdminPricingRouter());
+  app.use("/api/admin/pricing", createAdminPricingRouter());
 
   // ==================== HEALTH CHECK ====================
   
