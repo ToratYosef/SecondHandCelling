@@ -35,7 +35,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'https://api.secondhandcell.com',
+        target: process.env.VITE_API_URL || 'https://secondhandcelling.onrender.com',
         changeOrigin: true,
         secure: true,
       },
