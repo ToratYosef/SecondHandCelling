@@ -2147,17 +2147,39 @@ function createOrdersRouter() {
         notesInternal: notes
       });
       for (const d of devices) {
-        const deviceVariantId = d.modelId;
+        console.log("[submit-order] Resolving variant for device payload:", {
+          modelId: d.modelId,
+          storage: d.storage,
+          carrier: d.carrier,
+          quantity: d.quantity,
+          price: d.price
+        });
+        let variants = await storage.getDeviceVariantsByModelId(d.modelId);
+        console.log("[submit-order] Found variants:", variants.map((v) => ({ id: v.id, storage: v.storage, carrier: v.carrier })));
+        let match = variants.find((v) => (!d.storage || v.storage === d.storage) && (!d.carrier || v.carrier === d.carrier)) || variants[0];
+        if (!match) {
+          console.log("[submit-order] No variant matched; creating variant on the fly");
+          const created = await storage.createDeviceVariant({
+            deviceModelId: d.modelId,
+            storage: d.storage || "Unknown",
+            color: "Unknown",
+            carrier: d.carrier || "Unlocked",
+            conditionGrade: "A"
+          });
+          match = created;
+          variants = [created];
+        }
+        console.log("[submit-order] Using variant:", { id: match.id, storage: match.storage, carrier: match.carrier });
         await storage.createOrderItem({
           orderId: order.id,
-          deviceVariantId,
+          deviceVariantId: match.id,
           quantity: d.quantity ?? 1,
           unitPrice: d.price,
           lineTotal: d.price * (d.quantity ?? 1)
         });
         console.log("Created order item payload:", {
           orderId: order.id,
-          deviceVariantId,
+          deviceVariantId: match.id,
           quantity: d.quantity ?? 1,
           unitPrice: d.price,
           lineTotal: d.price * (d.quantity ?? 1)
@@ -2166,12 +2188,15 @@ function createOrdersRouter() {
       if (shippingAddress) {
         await storage.createShippingAddress({
           companyId: guestCompany.id,
-          name: shippingAddress.contactName,
+          contactName: shippingAddress.contactName || customerInfo.name || customerInfo.email,
+          phone: shippingAddress.phone || customerInfo.phone || "",
           street1: shippingAddress.street1,
+          street2: shippingAddress.street2 || null,
           city: shippingAddress.city,
           state: shippingAddress.state,
           postalCode: shippingAddress.postalCode,
-          phone: shippingAddress.phone
+          country: "USA",
+          isDefault: true
         });
       }
       return res.json({ orderNumber, order });
@@ -2288,6 +2313,23 @@ function createWebhookRouter() {
 }
 
 // server/routes.ts
+import { jwtVerify, createRemoteJWKSet } from "jose";
+var STACK_ISSUER = process.env.STACK_AUTH_ISSUER || "https://stack-auth.com";
+var STACK_AUDIENCE = process.env.STACK_AUTH_AUDIENCE || void 0;
+var STACK_JWKS_URL = process.env.STACK_AUTH_JWKS_URL || void 0;
+async function verifyJwt(token) {
+  try {
+    if (!STACK_JWKS_URL) return null;
+    const JWKS = createRemoteJWKSet(new URL(STACK_JWKS_URL));
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: STACK_ISSUER,
+      audience: STACK_AUDIENCE
+    });
+    return payload;
+  } catch {
+    return null;
+  }
+}
 var slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 var requireAuth = (req, res, next) => {
   if (!req.session.userId) {
@@ -2377,6 +2419,21 @@ async function registerRoutes(app2) {
       // Allow subdomain sharing
     }
   }));
+  app2.use(async (req, _res, next) => {
+    try {
+      const auth = req.headers.authorization || "";
+      if (auth.startsWith("Bearer ")) {
+        const token = auth.slice(7);
+        const claims = await verifyJwt(token);
+        if (claims && claims.sub) {
+          req.session.userId = claims.sub;
+          req.session.userRole = claims.role || req.session.userRole;
+        }
+      }
+    } catch {
+    }
+    next();
+  });
   app2.use((req, res, next) => {
     if (req.path.startsWith("/api/admin") || req.path === "/api/auth/me") {
       console.log("[Session Debug]", {
@@ -2459,6 +2516,29 @@ async function registerRoutes(app2) {
       console.error("Get public catalog error:", error);
       res.status(500).json({ error: "Failed to fetch catalog" });
     }
+  });
+  app2.get("/api/auth/stack/callback", async (req, res) => {
+    const token = req.query.token || "";
+    const claims = token ? await verifyJwt(token) : null;
+    if (!claims || !claims.sub) {
+      return res.status(400).json({ error: "Invalid token" });
+    }
+    const email = claims.email;
+    const name = claims.name;
+    let user = email ? await storage.getUserByEmail(email) : null;
+    if (!user && email) {
+      user = await storage.createUser({
+        name: name || email.split("@")[0],
+        email,
+        phone: "",
+        passwordHash: await bcrypt2.hash(Math.random().toString(36), 10),
+        role: "customer",
+        isActive: true
+      });
+    }
+    req.session.userId = user?.id || claims.sub;
+    req.session.userRole = user?.role || claims.role || "customer";
+    return res.json({ success: true });
   });
   app2.post("/api/auth/register", async (req, res) => {
     try {
