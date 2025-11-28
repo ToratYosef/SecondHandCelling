@@ -1,5 +1,5 @@
 // API Configuration - Always use Render backend
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://secondhandcelling.onrender.com';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.new.secondhandcell.com/';
 
 export function getApiUrl(path: string): string {
   // Remove leading slash if present to avoid double slashes

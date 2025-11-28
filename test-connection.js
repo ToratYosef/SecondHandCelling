@@ -5,7 +5,7 @@
  * Run with: node test-connection.js
  */
 
-const API_URL = process.env.VITE_API_URL || 'https://secondhandcelling.onrender.com';
+const API_URL = process.env.VITE_API_URL || 'https://api.new.secondhandcell.com/';
 
 console.log('Testing connection to:', API_URL);
 console.log('-----------------------------------\n');

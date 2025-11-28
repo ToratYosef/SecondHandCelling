@@ -4482,7 +4482,7 @@ var vite_config_default = defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "https://secondhandcelling.onrender.com",
+        target: process.env.VITE_API_URL || "https://api.new.secondhandcell.com/",
         changeOrigin: true,
         secure: true
       }
