@@ -1155,6 +1155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!guestCompany) {
           guestCompany = await storage.createCompany({
             name: 'Guest Orders',
+            legalName: 'Guest Orders',
             slug: 'guest-orders',
             type: 'supplier',
             isActive: true,
