@@ -135,6 +135,8 @@ export class ShipEngineService {
     weight?: number;
   }): Promise<CreateLabelResponse> {
     try {
+      console.log('[ShipEngine] createLabel called with params:', JSON.stringify(params, null, 2));
+
       // Normalize state to 2-letter abbreviation
       const normalizeState = (state: string): string => {
         const stateMap: { [key: string]: string } = {

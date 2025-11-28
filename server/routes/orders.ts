@@ -180,6 +180,13 @@ export function createOrdersRouter() {
 
       const { customerInfo, devices, shippingAddress, paymentMethod, notes } = parsed.data;
 
+      console.log('[submit-order] Received request:', {
+        customerEmail: customerInfo.email,
+        devicesCount: devices.length,
+        hasShippingAddress: !!shippingAddress,
+        shippingAddress: shippingAddress
+      });
+
       // Ensure guest user exists
       let guestUser = await storage.getUserByEmail(customerInfo.email);
       if (!guestUser) {
@@ -305,17 +312,32 @@ export function createOrdersRouter() {
       if (shippingAddress) {
         try {
           // For buyback: customer ships TO us, so customer address is ship_from
+          // Validate all required fields are present
+          const shipFromAddress = {
+            name: shippingAddress.contactName || customerInfo.name || customerInfo.email || 'Customer',
+            phone: shippingAddress.phone || customerInfo.phone || '0000000000',
+            street1: shippingAddress.street1 || shippingAddress.address1 || '',
+            street2: (shippingAddress as any).street2 || (shippingAddress as any).address2,
+            city: shippingAddress.city || '',
+            state: shippingAddress.state || '',
+            postalCode: shippingAddress.postalCode || shippingAddress.zipCode || shippingAddress.zip || '',
+            country: 'US',
+          };
+
+          // Validate required fields before calling ShipEngine
+          if (!shipFromAddress.street1 || !shipFromAddress.city || !shipFromAddress.state || !shipFromAddress.postalCode) {
+            console.error('[Order] Missing required shipping address fields:', {
+              hasStreet1: !!shipFromAddress.street1,
+              hasCity: !!shipFromAddress.city,
+              hasState: !!shipFromAddress.state,
+              hasPostalCode: !!shipFromAddress.postalCode,
+              receivedAddress: shippingAddress
+            });
+            throw new Error('Incomplete shipping address - missing required fields');
+          }
+
           const labelResponse = await shipEngineService.createLabel({
-            shipFrom: {
-              name: shippingAddress.contactName || customerInfo.name,
-              phone: shippingAddress.phone || customerInfo.phone,
-              street1: shippingAddress.street1,
-              street2: (shippingAddress as any).street2,
-              city: shippingAddress.city,
-              state: shippingAddress.state,
-              postalCode: shippingAddress.postalCode,
-              country: 'US',
-            },
+            shipFrom: shipFromAddress,
           });
 
           trackingNumber = labelResponse.tracking_number;

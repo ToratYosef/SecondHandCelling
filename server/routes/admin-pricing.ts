@@ -1,5 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { storage } from '../storage';
+import axios from 'axios';
+import https from 'https';
 
 export function createAdminPricingRouter() {
   const router = Router();
@@ -13,13 +15,21 @@ export function createAdminPricingRouter() {
         return res.status(400).json({ error: 'URL is required' });
       }
 
-      // Fetch the XML from the URL
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch XML: ${response.statusText}`);
-      }
+      // Fetch the XML from the URL with SSL configuration
+      // Create a custom HTTPS agent that's more permissive with SSL
+      const httpsAgent = new https.Agent({
+        rejectUnauthorized: false, // Accept self-signed certificates
+      });
 
-      const xml = await response.text();
+      const response = await axios.get(url, {
+        httpsAgent,
+        headers: {
+          'User-Agent': 'SecondHandCell/1.0',
+        },
+        timeout: 30000, // 30 second timeout
+      });
+
+      const xml = response.data;
       const result = await importXmlFeed(xml);
       return res.json(result);
     } catch (error: any) {
