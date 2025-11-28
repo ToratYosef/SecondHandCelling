@@ -304,8 +304,9 @@ export function createOrdersRouter() {
 
       if (shippingAddress) {
         try {
+          // For buyback: customer ships TO us, so customer address is ship_from
           const labelResponse = await shipEngineService.createLabel({
-            shipTo: {
+            shipFrom: {
               name: shippingAddress.contactName || customerInfo.name,
               phone: shippingAddress.phone || customerInfo.phone,
               street1: shippingAddress.street1,

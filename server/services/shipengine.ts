@@ -117,12 +117,13 @@ export class ShipEngineService {
   }
 
   /**
-   * Create a shipping label via ShipEngine API
+   * Create a shipping label
+   * For buyback: shipFrom = customer address, shipTo = company address (from env vars)
    */
   async createLabel(params: {
-    shipTo: {
+    shipFrom: {
       name: string;
-      phone?: string;
+      phone: string;
       street1: string;
       street2?: string;
       city: string;
@@ -131,7 +132,7 @@ export class ShipEngineService {
       country?: string;
     };
     serviceCode?: string;
-    weight?: number; // in ounces
+    weight?: number;
   }): Promise<CreateLabelResponse> {
     try {
       // Normalize state to 2-letter abbreviation
@@ -152,28 +153,28 @@ export class ShipEngineService {
         return stateMap[lower] || state.toUpperCase().substring(0, 2);
       };
 
-      // Build ship_from address from environment variables
-      const shipFrom: ShipToAddress = {
+      // Build ship_to address (your company - receiving the device)
+      const shipTo: ShipToAddress = {
         name: process.env.SHIPENGINE_FROM_NAME || 'SHC',
-        phone: process.env.SHIPENGINE_FROM_PHONE || '',
-        addressLine1: process.env.SHIPENGINE_FROM_ADDRESS1 || '',
-        addressLine2: process.env.SHIPENGINE_FROM_ADDRESS2 || undefined,
-        cityLocality: process.env.SHIPENGINE_FROM_CITY || '',
-        stateProvince: process.env.SHIPENGINE_FROM_STATE || '',
-        postalCode: process.env.SHIPENGINE_FROM_POSTAL || '',
+        phone: process.env.SHIPENGINE_FROM_PHONE || '2015551234',
+        addressLine1: process.env.SHIPENGINE_FROM_ADDRESS1 || '1206 McDonald Ave',
+        addressLine2: process.env.SHIPENGINE_FROM_ADDRESS2 || 'Ste Rear',
+        cityLocality: process.env.SHIPENGINE_FROM_CITY || 'Brooklyn',
+        stateProvince: process.env.SHIPENGINE_FROM_STATE || 'NY',
+        postalCode: process.env.SHIPENGINE_FROM_POSTAL || '11230',
         countryCode: 'US',
       };
 
-      // Build ship_to address
-      const shipTo: ShipToAddress = {
-        name: params.shipTo.name,
-        phone: params.shipTo.phone,
-        addressLine1: params.shipTo.street1,
-        addressLine2: params.shipTo.street2,
-        cityLocality: params.shipTo.city,
-        stateProvince: normalizeState(params.shipTo.state),
-        postalCode: params.shipTo.postalCode,
-        countryCode: params.shipTo.country || 'US',
+      // Build ship_from address (customer - sending the device)
+      const shipFrom: ShipToAddress = {
+        name: params.shipFrom.name,
+        phone: params.shipFrom.phone,
+        addressLine1: params.shipFrom.street1,
+        addressLine2: params.shipFrom.street2,
+        cityLocality: params.shipFrom.city,
+        stateProvince: normalizeState(params.shipFrom.state),
+        postalCode: params.shipFrom.postalCode,
+        countryCode: params.shipFrom.country || 'US',
       };
 
       // Default package weight (can be customized)
