@@ -1,34 +1,3 @@
-  // Endpoint to download label PDF for an order
-  router.get('/label/:orderNumber', async (req: Request, res: Response) => {
-    try {
-      const { orderNumber } = req.params;
-      // For demo, regenerate label (in production, store label after creation)
-      const order = await storage.getOrderByNumber(orderNumber);
-      if (!order) return res.status(404).send('Order not found');
-      // Fetch shipping address
-      const shippingAddress = await storage.getShippingAddress(order.shippingAddressId);
-      const PDFDocument = require('pdfkit');
-      const doc = new PDFDocument();
-      let pdfChunks: Buffer[] = [];
-      doc.text(`Shipping Label for Order ${orderNumber}`);
-      doc.text(`Name: ${shippingAddress?.contactName || ''}`);
-      doc.text(`Address: ${shippingAddress?.street1 || ''} ${shippingAddress?.street2 || ''}`);
-      doc.text(`City: ${shippingAddress?.city || ''}`);
-      doc.text(`State: ${shippingAddress?.state || ''}`);
-      doc.text(`Postal Code: ${shippingAddress?.postalCode || ''}`);
-      doc.text(`Country: USA`);
-      doc.end();
-      doc.on('data', (chunk: Buffer) => pdfChunks.push(chunk));
-      await new Promise(resolve => doc.on('end', resolve));
-      const pdfBuffer = Buffer.concat(pdfChunks);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=ShippingLabel-${orderNumber}.pdf`);
-      res.send(pdfBuffer);
-    } catch (error) {
-      console.error('Error generating label PDF:', error);
-      res.status(500).send('Failed to generate label PDF');
-    }
-  });
 import { Router, type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
@@ -37,6 +6,32 @@ import * as schema from '@shared/schema';
 
 export function createOrdersRouter() {
   const router = Router();
+
+  // Endpoint to download label PDF for an order
+  router.get('/label/:orderNumber', async (req: Request, res: Response) => {
+    try {
+      const { orderNumber } = req.params;
+      const order = await storage.getOrderByNumber(orderNumber);
+      if (!order) return res.status(404).send('Order not found');
+      
+      // Get shipment for this order
+      const shipments = await storage.getShipmentsByOrderId(order.id);
+      if (!shipments.length || !shipments[0].shippingLabelUrl) {
+        return res.status(404).send('No label found for this order');
+      }
+      
+      // Download label from ShipEngine
+      const { shipEngineService } = require('../services/shipengine');
+      const pdfBuffer = await shipEngineService.downloadLabelPdf(shipments[0].shippingLabelUrl);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=ShippingLabel-${orderNumber}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error downloading label PDF:', error);
+      res.status(500).send('Failed to download label PDF');
+    }
+  });
 
   // Fetch PDF content
   router.post('/fetch-pdf', async (req: Request, res: Response) => {
@@ -194,7 +189,7 @@ export function createOrdersRouter() {
           email: customerInfo.email,
           name: customerInfo.name || customerInfo.email.split('@')[0],
           passwordHash,
-          role: 'customer',
+          : 'customer',
           isActive: true,
         });
       }
@@ -285,8 +280,9 @@ export function createOrdersRouter() {
       }
 
       // Optional shipping address
+      let savedShippingAddress;
       if (shippingAddress) {
-        await storage.createShippingAddress({
+        savedShippingAddress = await storage.createShippingAddress({
           companyId: guestCompany.id,
           contactName: shippingAddress.contactName || customerInfo.name || customerInfo.email,
           phone: shippingAddress.phone || customerInfo.phone || "",
@@ -300,29 +296,65 @@ export function createOrdersRouter() {
         } as any);
       }
 
-      // Generate shipping label PDF
-      const PDFDocument = require('pdfkit');
+      // Generate shipping label via ShipEngine
+      const { shipEngineService } = require('../services/shipengine');
       const { sendOrderConfirmationEmail } = require('../services/email');
-      const doc = new PDFDocument();
-      let pdfChunks: Buffer[] = [];
-      doc.text(`Shipping Label for Order ${orderNumber}`);
-      doc.text(`Name: ${customerInfo.name}`);
-      doc.text(`Address: ${shippingAddress?.street1 || ''} ${shippingAddress?.street2 || ''}`);
-      doc.text(`City: ${shippingAddress?.city || ''}`);
-      doc.text(`State: ${shippingAddress?.state || ''}`);
-      doc.text(`Postal Code: ${shippingAddress?.postalCode || ''}`);
-      doc.text(`Country: USA`);
-      doc.end();
-      doc.on('data', (chunk: Buffer) => pdfChunks.push(chunk));
-      await new Promise(resolve => doc.on('end', resolve));
-      const pdfBuffer = Buffer.concat(pdfChunks);
+      
+      let labelPdfBuffer: Buffer | null = null;
+      let trackingNumber: string | null = null;
+      let trackingUrl: string | null = null;
+
+      if (shippingAddress) {
+        try {
+          const labelResponse = await shipEngineService.createLabel({
+            shipTo: {
+              name: shippingAddress.contactName || customerInfo.name,
+              phone: shippingAddress.phone || customerInfo.phone,
+              street1: shippingAddress.street1,
+              street2: (shippingAddress as any).street2,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              postalCode: shippingAddress.postalCode,
+              country: 'US',
+            },
+          });
+
+          trackingNumber = labelResponse.tracking_number;
+          trackingUrl = `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+
+          // Create shipment record
+          await storage.createShipment({
+            orderId: order.id,
+            carrier: labelResponse.carrier_code || 'USPS',
+            serviceLevel: labelResponse.service_code || 'usps_priority_mail',
+            trackingNumber: trackingNumber,
+            shippingLabelUrl: labelResponse.label_download?.pdf || labelResponse.label_download?.href,
+          } as any);
+
+          // Download label PDF from ShipEngine
+          if (labelResponse.label_download?.pdf) {
+            labelPdfBuffer = await shipEngineService.downloadLabelPdf(labelResponse.label_download.pdf);
+          }
+
+          console.log('[Order] ShipEngine label created:', {
+            orderId: order.id,
+            trackingNumber,
+            labelUrl: labelResponse.label_download?.pdf,
+          });
+        } catch (error) {
+          console.error('[Order] Failed to create ShipEngine label:', error);
+          // Continue without label - admin can generate later
+        }
+      }
 
       // Send confirmation email with label PDF
       await sendOrderConfirmationEmail({
         to: customerInfo.email,
         order,
         orderNumber,
-        labelPdf: pdfBuffer,
+        labelPdf: labelPdfBuffer,
+        trackingNumber,
+        trackingUrl,
         shippingAddress,
       });
 

@@ -1,21 +1,3 @@
-    async getShippingAddress(id: string): Promise<ShippingAddress | undefined> {
-      if (!id) return undefined;
-      const [address] = await db.select().from(schema.shippingAddresses).where(eq(schema.shippingAddresses.id, id));
-      return address || undefined;
-    }
-  async getNextOrderNumber(): Promise<string> {
-    // Get the highest order number
-    const result = await db.select({ orderNumber: schema.orders.orderNumber })
-      .from(schema.orders)
-      .orderBy(desc(schema.orders.createdAt))
-      .limit(1);
-    let nextNum = 1;
-    if (result.length && result[0].orderNumber?.startsWith('SHC-')) {
-      const num = parseInt(result[0].orderNumber.replace('SHC-', ''), 10);
-      if (!isNaN(num)) nextNum = num + 1;
-    }
-    return `SHC-${nextNum}`;
-  }
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { 
@@ -144,6 +126,10 @@ export interface IStorage {
   // Shipment methods
   createShipment(shipment: InsertShipment): Promise<Shipment>;
   getShipmentsByOrderId(orderId: string): Promise<Shipment[]>;
+  
+  // Utility methods
+  getShippingAddress(id: string): Promise<ShippingAddress | undefined>;
+  getNextOrderNumber(): Promise<string>;
   
   // FAQ methods
   getAllFaqs(): Promise<Faq[]>;
@@ -424,6 +410,26 @@ export class DatabaseStorage implements IStorage {
   async updateShippingAddress(id: string, updates: Partial<ShippingAddress>): Promise<ShippingAddress | undefined> {
     const [address] = await db.update(schema.shippingAddresses).set(updates).where(eq(schema.shippingAddresses.id, id)).returning();
     return address || undefined;
+  }
+
+  async getShippingAddress(id: string): Promise<ShippingAddress | undefined> {
+    if (!id) return undefined;
+    const [address] = await db.select().from(schema.shippingAddresses).where(eq(schema.shippingAddresses.id, id));
+    return address || undefined;
+  }
+
+  async getNextOrderNumber(): Promise<string> {
+    // Get the highest order number
+    const result = await db.select({ orderNumber: schema.orders.orderNumber })
+      .from(schema.orders)
+      .orderBy(desc(schema.orders.createdAt))
+      .limit(1);
+    let nextNum = 1;
+    if (result.length && result[0].orderNumber?.startsWith('SHC-')) {
+      const num = parseInt(result[0].orderNumber.replace('SHC-', ''), 10);
+      if (!isNaN(num)) nextNum = num + 1;
+    }
+    return `SHC-${nextNum}`;
   }
 
   async getBillingAddressesByCompanyId(companyId: string): Promise<BillingAddress[]> {

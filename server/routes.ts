@@ -1187,8 +1187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Generate order number for guest (sell) orders
-        const orderNumber = `SL-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
-          const orderNumber = await storage.getNextOrderNumber();
+        const orderNumber = await storage.getNextOrderNumber();
         
         // Calculate total
         let total = 0;

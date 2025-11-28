@@ -47,7 +47,7 @@ interface EmailLayoutOptions {
   includeCountdownNotice?: boolean;
 }
 
-function buildEmailLayout({
+export function buildEmailLayout({
   title = "",
   bodyHtml = "",
   accentColor = "#16a34a",

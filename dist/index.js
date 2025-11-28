@@ -1,8 +1,572 @@
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc2) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// server/helpers/emailTemplates.ts
+function buildTrustpilotSection() {
+  return `
+    <div style="text-align:center; padding: 28px 24px 32px; background-color:#f8fafc; border-top: 1px solid #e2e8f0;">
+      <p style="font-weight:600; color:#0f172a; font-size:18px; margin:0 0 12px 0;">Loved your experience?</p>
+      <a href="${TRUSTPILOT_REVIEW_LINK}" style="display:inline-block; text-decoration:none; border:none; outline:none;">
+        <img src="${TRUSTPILOT_STARS_IMAGE_URL}" alt="Rate us on Trustpilot" style="height:58px; width:auto; display:block; margin:0 auto 10px auto; border:0;">
+      </a>
+      <p style="font-size:15px; color:#475569; margin:12px 0 0;">Your feedback keeps the <strong>SecondHandCell</strong> community thriving.</p>
+    </div>
+  `;
+}
+function buildCountdownNoticeHtml() {
+  return `
+    <div style="margin-top: 24px; padding: 18px 20px; background-color: #ecfdf5; border-radius: 12px; border: 1px solid #bbf7d0; color: #065f46; font-size: 17px; line-height: 1.6;">
+      <strong style="display:block; font-size:18px; margin-bottom:8px;">Friendly reminder</strong>
+      If we don't hear back, we may finalize your device at <strong>75% less</strong> to keep your order moving.
+    </div>
+  `;
+}
+function escapeHtml(text2) {
+  const map = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  };
+  return text2.replace(/[&<>"']/g, (m) => map[m]);
+}
+function buildEmailLayout({
+  title = "",
+  bodyHtml = "",
+  accentColor = "#16a34a",
+  includeTrustpilot = true,
+  footerText = "Need help? Reply to this email or call (347) 688-0662.",
+  includeCountdownNotice = false
+} = {}) {
+  const headingSection = title ? `
+        <tr>
+          <td style="background:${accentColor}; padding: 30px 24px; text-align:center;">
+            <h1 style="margin:0; font-size:28px; line-height:1.3; color:#ffffff; font-weight:700;">${escapeHtml(
+    title
+  )}</h1>
+          </td>
+        </tr>
+      ` : "";
+  const trustpilotSection = includeTrustpilot ? buildTrustpilotSection() : "";
+  const countdownSection = includeCountdownNotice ? buildCountdownNoticeHtml() : "";
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${escapeHtml(title || "SecondHandCell Update")}</title>
+      <style>
+        body { background-color:#f1f5f9; margin:0; padding:24px 12px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#0f172a; }
+        .email-shell { width:100%; max-width:640px; margin:0 auto; background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 25px 45px rgba(15,23,42,0.08); border:1px solid #e2e8f0; }
+        .logo-cell { padding:28px 0 16px; text-align:center; background-color:#ffffff; }
+        .logo-cell img { height:56px; width:auto; }
+        .content-cell { padding:32px 30px; font-size:17px; line-height:1.75; }
+        .content-cell p { margin:0 0 20px; }
+        .footer-cell { padding:28px 32px; text-align:center; font-size:15px; color:#475569; background-color:#f8fafc; border-top:1px solid #e2e8f0; }
+        .footer-cell p { margin:4px 0; }
+        a.button-link { display:inline-block; padding:14px 26px; border-radius:9999px; background-color:#16a34a; color:#ffffff !important; font-weight:600; text-decoration:none; font-size:17px; }
+      </style>
+    </head>
+    <body>
+      <table role="presentation" cellpadding="0" cellspacing="0" class="email-shell">
+        <tr>
+          <td class="logo-cell">
+            <img src="${EMAIL_LOGO_URL}" alt="SecondHandCell Logo" />
+          </td>
+        </tr>
+        ${headingSection}
+        <tr>
+          <td class="content-cell">
+            ${bodyHtml}
+            ${countdownSection}
+          </td>
+        </tr>
+        ${trustpilotSection ? `<tr><td>${trustpilotSection}</td></tr>` : ""}
+        <tr>
+          <td class="footer-cell">
+            <p>${footerText}</p>
+            <p>\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} SecondHandCell. All rights reserved.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+function getOrderCompletedEmailTemplate({ includeTrustpilot = true } = {}) {
+  return buildEmailLayout({
+    title: "\u{1F973} Your order is complete!",
+    includeTrustpilot,
+    bodyHtml: `
+        <p>Hi **CUSTOMER_NAME**,</p>
+        <p>Great news! Order <strong>#**ORDER_ID**</strong> is complete and your payout is headed your way.</p>
+        <div style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:20px 24px; margin:28px 0;">
+          <p style="margin:0 0 12px;"><strong style="color:#0f172a;">Device</strong><br><span style="color:#475569;">**DEVICE_SUMMARY**</span></p>
+          <p style="margin:0 0 12px;"><strong style="color:#0f172a;">Payout</strong><br><span style="color:#059669; font-size:22px; font-weight:700;">$**ORDER_TOTAL**</span></p>
+          <p style="margin:0;"><strong style="color:#0f172a;">Payment method</strong><br><span style="color:#475569;">**PAYMENT_METHOD**</span></p>
+        </div>
+        <p>Thanks for choosing SecondHandCell!</p>
+    `
+  });
+}
+function replaceEmailVariables(template, variables) {
+  let result = template;
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`\\*\\*${key}\\*\\*`, "g");
+    result = result.replace(regex, value || "");
+  }
+  return result;
+}
+var EMAIL_LOGO_URL, TRUSTPILOT_REVIEW_LINK, TRUSTPILOT_STARS_IMAGE_URL, SHIPPING_LABEL_EMAIL_HTML, SHIPPING_KIT_EMAIL_HTML, ORDER_RECEIVED_EMAIL_HTML, DEVICE_RECEIVED_EMAIL_HTML, ORDER_PLACED_ADMIN_EMAIL_HTML, BLACKLISTED_EMAIL_HTML, FMI_EMAIL_HTML, BAL_DUE_EMAIL_HTML, DOWNGRADE_EMAIL_HTML, REVIEW_REQUEST_EMAIL_HTML, EMAIL_TEMPLATES;
+var init_emailTemplates = __esm({
+  "server/helpers/emailTemplates.ts"() {
+    "use strict";
+    EMAIL_LOGO_URL = "https://raw.githubusercontent.com/ToratYosef/BuyBacking/refs/heads/main/assets/logo.png";
+    TRUSTPILOT_REVIEW_LINK = "https://www.trustpilot.com/evaluate/secondhandcell.com";
+    TRUSTPILOT_STARS_IMAGE_URL = "https://cdn.trustpilot.net/brand-assets/4.1.0/stars/stars-5.png";
+    SHIPPING_LABEL_EMAIL_HTML = buildEmailLayout({
+      title: "Your Shipping Label is Ready!",
+      bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Your shipping label for order <strong>#**ORDER_ID**</strong> is ready to go.</p>
+      <p style="margin-bottom:28px;">Use the secure button below to download it instantly and get your device on the way to us.</p>
+      <div style="text-align:center; margin-bottom:32px;">
+        <a href="**LABEL_DOWNLOAD_LINK**" class="button-link">Download Shipping Label</a>
+      </div>
+      <div style="background:#f8fafc; border:1px solid #dbeafe; border-radius:14px; padding:20px 24px;">
+        <p style="margin:0 0 10px;"><strong style="color:#0f172a;">Tracking Number</strong><br><span style="color:#2563eb; font-weight:600;">**TRACKING_NUMBER**</span></p>
+        <p style="margin:0; color:#475569;">Drop your device off with your preferred carrier as soon as you're ready.</p>
+      </div>
+      <p style="margin-top:28px;">Need a hand? Reply to this email and our team will guide you.</p>
+  `
+    });
+    SHIPPING_KIT_EMAIL_HTML = buildEmailLayout({
+      title: "Your Shipping Kit is on its Way!",
+      bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Your shipping kit for order <strong>#**ORDER_ID**</strong> is en route.</p>
+      <p>Track its journey with the number below and get ready to pop your device inside once it arrives.</p>
+      <div style="background:#f8fafc; border:1px solid #dbeafe; border-radius:14px; padding:20px 24px; margin:0 0 28px;">
+        <p style="margin:0 0 10px;"><strong style="color:#0f172a;">Tracking Number</strong><br><span style="color:#2563eb; font-weight:600;">**TRACKING_NUMBER**</span></p>
+        <p style="margin:0; color:#475569;">Keep an eye out for your kit and pack your device securely when it lands.</p>
+      </div>
+      <p>Have accessories you don't need? Feel free to include them\u2014we'll recycle responsibly.</p>
+      <p>Need anything else? Just reply to this email.</p>
+  `
+    });
+    ORDER_RECEIVED_EMAIL_HTML = buildEmailLayout({
+      title: "We've received your order!",
+      bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Thanks for choosing SecondHandCell! We've logged your order for <strong>**DEVICE_NAME**</strong>.</p>
+      <p>Your order ID is <strong style="color:#2563eb;">#**ORDER_ID**</strong>. Keep it handy for any questions.</p>
+      <h2 style="font-size:20px; color:#0f172a; margin:32px 0 12px;">Before you ship</h2>
+      <ul style="padding-left:22px; margin:0 0 20px; color:#475569;">
+        <li style="margin-bottom:10px;"><strong>Backup your data</strong> so nothing personal is lost.</li>
+        <li style="margin-bottom:10px;"><strong>Factory reset</strong> the device to wipe personal info.</li>
+        <li style="margin-bottom:10px;"><strong>Remove accounts</strong> such as Apple ID/iCloud or Google/Samsung accounts.<br><span style="display:block; margin-top:6px; margin-left:10px;">\u2022 Turn off Find My iPhone (FMI).<br>\u2022 Disable Factory Reset Protection (FRP) on Android.</span></li>
+        <li style="margin-bottom:10px;"><strong>Remove SIM cards</strong> and eSIM profiles.</li>
+        <li style="margin-bottom:10px;"><strong>Pack accessories separately</strong> unless we specifically request them.</li>
+      </ul>
+      <div style="background:#fef3c7; border-radius:16px; padding:18px 22px; border:1px solid #fde68a; color:#92400e; margin:30px 0;">
+        <strong>Important:</strong> We can't process devices that still have FMI/FRP enabled, an outstanding balance, or a blacklist/lost/stolen status.
+      </div>
+      **SHIPPING_INSTRUCTION**
+  `
+    });
+    DEVICE_RECEIVED_EMAIL_HTML = buildEmailLayout({
+      title: "Your device has arrived!",
+      bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Your device for order <strong style="color:#2563eb;">#**ORDER_ID**</strong> has landed at our facility.</p>
+      <p>Our technicians are giving it a full inspection now. We'll follow up shortly with an update on your payout.</p>
+      <p>Have questions while you wait? Just reply to this email\u2014real humans are here to help.</p>
+  `
+    });
+    ORDER_PLACED_ADMIN_EMAIL_HTML = buildEmailLayout({
+      title: "New order submitted",
+      accentColor: "#f97316",
+      bodyHtml: `
+      <p>Heads up! A new order just came in.</p>
+      <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:16px; padding:22px 24px; margin-bottom:28px; color:#7c2d12;">
+        <p style="margin:0 0 10px;"><strong>Customer</strong>: **CUSTOMER_NAME**</p>
+        <p style="margin:0 0 10px;"><strong>Order ID</strong>: #**ORDER_ID**</p>
+        <p style="margin:0 0 10px;"><strong>Device</strong>: **DEVICE_NAME**</p>
+        <p style="margin:0;"><strong>Estimated Quote</strong>: $**ESTIMATED_QUOTE** \u2022 <strong>Shipping</strong>: **SHIPPING_PREFERENCE**</p>
+      </div>
+      <div style="text-align:center; margin-bottom:20px;">
+        <a href="https://secondhandcell.com/admin" class="button-link" style="background-color:#f97316;">Open in Admin</a>
+      </div>
+      <p style="color:#475569;">This alert is automated\u2014feel free to reply if you notice anything unusual.</p>
+  `
+    });
+    BLACKLISTED_EMAIL_HTML = buildEmailLayout({
+      title: "Action required: Carrier blacklist detected",
+      accentColor: "#dc2626",
+      includeCountdownNotice: true,
+      includeTrustpilot: false,
+      bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>During our review of order <strong>#**ORDER_ID**</strong>, the carrier database flagged the device as lost, stolen, or blacklisted.</p>
+      <p>We can't release payment while this status is active. Please contact your carrier to remove the flag and reply with confirmation or documentation so we can re-run the check.</p>
+      <p>If you believe this alert is an error, include any proof in your reply and we'll take another look.</p>
+      <div style="color:#dc2626; font-size:15px; line-height:1.6;">
+        <p style="margin: 0 0 16px;">State and local law require us to hold devices that test positive for a lost, stolen, or blacklisted status. Key regulations include:</p>
+        <ul style="margin: 0 0 16px; padding-left: 20px;">
+          <li><strong>New York Penal Law \xA7\xA7 155.05(2)(b) &amp; 165.40\u2013165.54:</strong> Buying or possessing property that is reported lost or stolen can constitute larceny or criminal possession of stolen property.</li>
+          <li><strong>New York City Administrative Code \xA7\xA7 20-272 &amp; 20-273:</strong> Secondhand dealers must record every transaction, report suspicious items to the NYPD, and hold flagged goods for law enforcement review.</li>
+          <li><strong>New York General Business Law Article 6:</strong> Requires detailed recordkeeping and prohibits resale of devices until legal status issues are resolved.</li>
+        </ul>
+        <p style="margin: 0;">We will continue to cooperate with law enforcement and cannot release the device back to you unless they authorize it. For more information, review our <a href="https://secondhandcell.com/terms.html" style="color:#2563eb;">Terms &amp; Conditions</a> or reply with documentation clearing the device so we can re-run the check.</p>
+      </div>
+  `
+    });
+    FMI_EMAIL_HTML = buildEmailLayout({
+      title: "Turn off Find My to continue",
+      accentColor: "#f59e0b",
+      includeCountdownNotice: true,
+      includeTrustpilot: false,
+      bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>Our inspection for order <strong>#**ORDER_ID**</strong> shows Find My iPhone / Activation Lock is still enabled.</p>
+      <p>Please complete the steps below so we can finish processing your payout:</p>
+      <ol style="padding-left:22px; color:#475569; margin-bottom:20px;">
+        <li>Visit <a href="https://icloud.com/find" target="_blank" style="color:#2563eb;">icloud.com/find</a> and sign in.</li>
+        <li>Select the device you're selling.</li>
+        <li>Choose "Remove from Account".</li>
+        <li>Confirm the device no longer appears in your list.</li>
+      </ol>
+      <div style="text-align:center; margin:32px 0 24px;">
+        <a href="**CONFIRM_URL**" class="button-link" style="background-color:#f59e0b;">I've turned off Find My</a>
+      </div>
+      <p style="color:#b45309; font-size:15px;">Once it's disabled, click the button above or reply to this email so we can recheck your device.</p>
+  `
+    });
+    BAL_DUE_EMAIL_HTML = buildEmailLayout({
+      title: "Balance due with your carrier",
+      accentColor: "#f97316",
+      includeCountdownNotice: true,
+      includeTrustpilot: false,
+      bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>When we ran your device for order <strong>#**ORDER_ID**</strong>, the carrier reported a status of <strong>**FINANCIAL_STATUS**</strong>.</p>
+      <p>Please contact your carrier to clear the balance and then reply to this email so we can rerun the check and keep your payout on track.</p>
+      <p style="color:#c2410c;">Need help figuring out the right department to call? Let us know and we'll point you in the right direction.</p>
+  `
+    });
+    DOWNGRADE_EMAIL_HTML = buildEmailLayout({
+      title: "Order finalized at adjusted payout",
+      accentColor: "#f97316",
+      includeTrustpilot: false,
+      bodyHtml: `
+      <p>Hi **CUSTOMER_NAME**,</p>
+      <p>We reached out about the issue with your device for order <strong>#**ORDER_ID**</strong> but haven't received an update.</p>
+      <p>To keep things moving, we've finalized the device at 75% less than the original offer. If you resolve the issue, reply to this email and we'll happily re-evaluate.</p>
+      <p>We're here to help\u2014just let us know how you'd like to proceed.</p>
+  `
+    });
+    REVIEW_REQUEST_EMAIL_HTML = buildEmailLayout({
+      title: "We'd love your feedback",
+      accentColor: "#0ea5e9",
+      bodyHtml: `
+      <p>Hello **CUSTOMER_NAME**,</p>
+      <p>Thanks again for trusting us with your device. Sharing a quick review helps other sellers feel confident working with SecondHandCell.</p>
+      <p style="margin-bottom:32px;">It only takes a minute and means the world to our team.</p>
+      <div style="text-align:center; margin-bottom:24px;">
+        <a href="${TRUSTPILOT_REVIEW_LINK}" class="button-link" style="background-color:#0ea5e9;">Leave a Trustpilot review</a>
+      </div>
+      <p style="text-align:center; color:#475569;">Thank you for being part of the SecondHandCell community!</p>
+  `
+    });
+    EMAIL_TEMPLATES = {
+      SHIPPING_LABEL: {
+        subject: "Your SecondHandCell Shipping Label for Order #**ORDER_ID**",
+        html: SHIPPING_LABEL_EMAIL_HTML
+      },
+      SHIPPING_KIT: {
+        subject: "Your SecondHandCell Shipping Kit for Order #**ORDER_ID** is on its Way!",
+        html: SHIPPING_KIT_EMAIL_HTML
+      },
+      ORDER_RECEIVED: {
+        subject: "Order Confirmation #**ORDER_ID** - SecondHandCell",
+        html: ORDER_RECEIVED_EMAIL_HTML
+      },
+      DEVICE_RECEIVED: {
+        subject: "Your Device Has Arrived - Order #**ORDER_ID**",
+        html: DEVICE_RECEIVED_EMAIL_HTML
+      },
+      ORDER_PLACED_ADMIN: {
+        subject: "New Order Submitted - #**ORDER_ID**",
+        html: ORDER_PLACED_ADMIN_EMAIL_HTML
+      },
+      BLACKLISTED: {
+        subject: "Important Notice Regarding Your Device for Order #**ORDER_ID**",
+        html: BLACKLISTED_EMAIL_HTML
+      },
+      FMI_ACTIVE: {
+        subject: "Action Required: Turn Off Find My iPhone - Order #**ORDER_ID**",
+        html: FMI_EMAIL_HTML
+      },
+      BALANCE_DUE: {
+        subject: "Action Required: Outstanding Balance Detected - Order #**ORDER_ID**",
+        html: BAL_DUE_EMAIL_HTML
+      },
+      DOWNGRADE: {
+        subject: "Order Update - Adjusted Payout for #**ORDER_ID**",
+        html: DOWNGRADE_EMAIL_HTML
+      },
+      ORDER_COMPLETED: {
+        subject: "Your Payout is on the Way! - Order #**ORDER_ID**",
+        getHtml: getOrderCompletedEmailTemplate
+      },
+      REVIEW_REQUEST: {
+        subject: "How was your experience with SecondHandCell?",
+        html: REVIEW_REQUEST_EMAIL_HTML
+      }
+    };
+  }
+});
+
+// server/services/email.ts
+var email_exports = {};
+__export(email_exports, {
+  getEmailTransporter: () => getEmailTransporter,
+  sendEmail: () => sendEmail,
+  sendOrderConfirmationEmail: () => sendOrderConfirmationEmail
+});
+import nodemailer from "nodemailer";
+async function sendOrderConfirmationEmail({ to, order, orderNumber, labelPdf, trackingNumber, trackingUrl, shippingAddress }) {
+  const trackingHtml = trackingNumber ? `
+    <p><strong>Tracking Number:</strong> ${trackingNumber}</p>
+    ${trackingUrl ? `<p><a href="${trackingUrl}" style="color: #16a34a;">Track Your Package</a></p>` : ""}
+  ` : "";
+  const labelHtml = labelPdf ? `
+    <p>Your shipping label is attached as a PDF. Please print and attach it to your package.</p>
+  ` : `
+    <p>Your shipping label will be available soon. We'll send you another email once it's ready.</p>
+  `;
+  const html = buildEmailLayout({
+    title: `Order Confirmation: ${orderNumber}`,
+    bodyHtml: `
+      <p>Thank you for your order!</p>
+      <p><strong>Order Number:</strong> ${orderNumber}</p>
+      ${trackingHtml}
+      <p><strong>Shipping Address:</strong><br>
+        ${shippingAddress?.contactName || ""}<br>
+        ${shippingAddress?.street1 || ""} ${shippingAddress?.street2 || ""}<br>
+        ${shippingAddress?.city || ""}, ${shippingAddress?.state || ""} ${shippingAddress?.postalCode || ""}<br>
+        USA
+      </p>
+      ${labelHtml}
+    `,
+    accentColor: "#16a34a",
+    includeTrustpilot: true
+  });
+  const attachments = labelPdf ? [
+    {
+      filename: `ShippingLabel-${orderNumber}.pdf`,
+      content: labelPdf,
+      contentType: "application/pdf"
+    }
+  ] : [];
+  await sendEmail({
+    to,
+    subject: `Your SecondHandCell Order ${orderNumber}`,
+    html,
+    attachments
+  });
+}
+function getEmailTransporter() {
+  if (!transporter) {
+    const emailUser = process.env.EMAIL_USER;
+    const emailPass = process.env.EMAIL_PASS;
+    if (!emailUser || !emailPass) {
+      throw new Error("Email credentials not configured. Set EMAIL_USER and EMAIL_PASS environment variables.");
+    }
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: emailUser,
+        pass: emailPass
+      }
+    });
+  }
+  return transporter;
+}
+async function sendEmail(mailOptions) {
+  try {
+    const transporter2 = getEmailTransporter();
+    const defaultFrom = process.env.EMAIL_FROM || `SecondHandCell <${process.env.EMAIL_USER}>`;
+    await transporter2.sendMail({
+      from: mailOptions.from || defaultFrom,
+      ...mailOptions
+    });
+    console.log("Email sent successfully to:", mailOptions.to);
+  } catch (error) {
+    console.error("Error sending email:", error);
+    throw error;
+  }
+}
+var transporter;
+var init_email = __esm({
+  "server/services/email.ts"() {
+    "use strict";
+    init_emailTemplates();
+    transporter = null;
+  }
+});
+
+// server/services/shipengine.ts
+var shipengine_exports = {};
+__export(shipengine_exports, {
+  ShipEngineService: () => ShipEngineService,
+  shipEngineService: () => shipEngineService
+});
+import axios3 from "axios";
+var ShipEngineService, shipEngineService;
+var init_shipengine = __esm({
+  "server/services/shipengine.ts"() {
+    "use strict";
+    ShipEngineService = class {
+      apiKey;
+      baseUrl = "https://api.shipengine.com/v1";
+      testMode;
+      constructor() {
+        this.apiKey = process.env.SHIPENGINE_KEY_TEST || process.env.SHIPENGINE_KEY || "";
+        this.testMode = !!process.env.SHIPENGINE_KEY_TEST;
+        if (!this.apiKey) {
+          throw new Error("ShipEngine API key not configured");
+        }
+      }
+      /**
+       * Create a shipping label via ShipEngine API
+       */
+      async createLabel(params) {
+        try {
+          const shipFrom = {
+            name: process.env.SHIPENGINE_FROM_NAME || "SHC",
+            phone: process.env.SHIPENGINE_FROM_PHONE || "",
+            addressLine1: process.env.SHIPENGINE_FROM_ADDRESS1 || "",
+            addressLine2: process.env.SHIPENGINE_FROM_ADDRESS2 || void 0,
+            cityLocality: process.env.SHIPENGINE_FROM_CITY || "",
+            stateProvince: process.env.SHIPENGINE_FROM_STATE || "",
+            postalCode: process.env.SHIPENGINE_FROM_POSTAL || "",
+            countryCode: "US"
+          };
+          const shipTo = {
+            name: params.shipTo.name,
+            phone: params.shipTo.phone,
+            addressLine1: params.shipTo.street1,
+            addressLine2: params.shipTo.street2,
+            cityLocality: params.shipTo.city,
+            stateProvince: params.shipTo.state,
+            postalCode: params.shipTo.postalCode,
+            countryCode: params.shipTo.country || "US"
+          };
+          const packageWeight = params.weight || 8;
+          const requestBody = {
+            shipment: {
+              service_code: params.serviceCode || "usps_priority_mail",
+              ship_to: shipTo,
+              ship_from: shipFrom,
+              packages: [
+                {
+                  weight: {
+                    value: packageWeight,
+                    unit: "ounce"
+                  }
+                }
+              ]
+            },
+            test_label: this.testMode
+          };
+          console.log("[ShipEngine] Creating label with request:", JSON.stringify(requestBody, null, 2));
+          const response = await axios3.post(
+            `${this.baseUrl}/labels`,
+            requestBody,
+            {
+              headers: {
+                "API-Key": this.apiKey,
+                "Content-Type": "application/json"
+              }
+            }
+          );
+          console.log("[ShipEngine] Label created successfully:", {
+            label_id: response.data.label_id,
+            tracking_number: response.data.tracking_number,
+            pdf_url: response.data.label_download?.pdf
+          });
+          return response.data;
+        } catch (error) {
+          console.error("[ShipEngine] Error creating label:", {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+          });
+          throw new Error(`ShipEngine API error: ${error.response?.data?.message || error.message}`);
+        }
+      }
+      /**
+       * Download label PDF from ShipEngine URL
+       */
+      async downloadLabelPdf(pdfUrl) {
+        try {
+          const response = await axios3.get(pdfUrl, {
+            responseType: "arraybuffer",
+            headers: {
+              "API-Key": this.apiKey
+            }
+          });
+          return Buffer.from(response.data);
+        } catch (error) {
+          console.error("[ShipEngine] Error downloading label PDF:", error.message);
+          throw new Error(`Failed to download label PDF: ${error.message}`);
+        }
+      }
+      /**
+       * Void a shipping label
+       */
+      async voidLabel(labelId) {
+        try {
+          await axios3.put(
+            `${this.baseUrl}/labels/${labelId}/void`,
+            {},
+            {
+              headers: {
+                "API-Key": this.apiKey
+              }
+            }
+          );
+          console.log(`[ShipEngine] Label ${labelId} voided successfully`);
+        } catch (error) {
+          console.error("[ShipEngine] Error voiding label:", error.message);
+          throw new Error(`Failed to void label: ${error.message}`);
+        }
+      }
+    };
+    shipEngineService = new ShipEngineService();
+  }
+});
 
 // server/index.ts
 import express2 from "express";
@@ -940,6 +1504,20 @@ var DatabaseStorage = class {
     const [address] = await db.update(shippingAddresses).set(updates).where(eq(shippingAddresses.id, id)).returning();
     return address || void 0;
   }
+  async getShippingAddress(id) {
+    if (!id) return void 0;
+    const [address] = await db.select().from(shippingAddresses).where(eq(shippingAddresses.id, id));
+    return address || void 0;
+  }
+  async getNextOrderNumber() {
+    const result = await db.select({ orderNumber: orders.orderNumber }).from(orders).orderBy(desc(orders.createdAt)).limit(1);
+    let nextNum = 1;
+    if (result.length && result[0].orderNumber?.startsWith("SHC-")) {
+      const num = parseInt(result[0].orderNumber.replace("SHC-", ""), 10);
+      if (!isNaN(num)) nextNum = num + 1;
+    }
+    return `SHC-${nextNum}`;
+  }
   async getBillingAddressesByCompanyId(companyId) {
     return await db.select().from(billingAddresses).where(eq(billingAddresses.companyId, companyId));
   }
@@ -1058,373 +1636,17 @@ var DatabaseStorage = class {
 var storage = new DatabaseStorage();
 
 // server/routes.ts
+init_email();
 import bcrypt2 from "bcrypt";
 import { z as z2 } from "zod";
 
-// server/services/email.ts
-import nodemailer from "nodemailer";
-var transporter = null;
-function getEmailTransporter() {
-  if (!transporter) {
-    const emailUser = process.env.EMAIL_USER;
-    const emailPass = process.env.EMAIL_PASS;
-    if (!emailUser || !emailPass) {
-      throw new Error("Email credentials not configured. Set EMAIL_USER and EMAIL_PASS environment variables.");
-    }
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: emailUser,
-        pass: emailPass
-      }
-    });
-  }
-  return transporter;
-}
-async function sendEmail(mailOptions) {
-  try {
-    const transporter2 = getEmailTransporter();
-    const defaultFrom = process.env.EMAIL_FROM || `SecondHandCell <${process.env.EMAIL_USER}>`;
-    await transporter2.sendMail({
-      from: mailOptions.from || defaultFrom,
-      ...mailOptions
-    });
-    console.log("Email sent successfully to:", mailOptions.to);
-  } catch (error) {
-    console.error("Error sending email:", error);
-    throw error;
-  }
-}
-
 // server/routes/emails.ts
+init_email();
+init_emailTemplates();
 import { Router } from "express";
-
-// server/helpers/emailTemplates.ts
-var EMAIL_LOGO_URL = "https://raw.githubusercontent.com/ToratYosef/BuyBacking/refs/heads/main/assets/logo.png";
-var TRUSTPILOT_REVIEW_LINK = "https://www.trustpilot.com/evaluate/secondhandcell.com";
-var TRUSTPILOT_STARS_IMAGE_URL = "https://cdn.trustpilot.net/brand-assets/4.1.0/stars/stars-5.png";
-function buildTrustpilotSection() {
-  return `
-    <div style="text-align:center; padding: 28px 24px 32px; background-color:#f8fafc; border-top: 1px solid #e2e8f0;">
-      <p style="font-weight:600; color:#0f172a; font-size:18px; margin:0 0 12px 0;">Loved your experience?</p>
-      <a href="${TRUSTPILOT_REVIEW_LINK}" style="display:inline-block; text-decoration:none; border:none; outline:none;">
-        <img src="${TRUSTPILOT_STARS_IMAGE_URL}" alt="Rate us on Trustpilot" style="height:58px; width:auto; display:block; margin:0 auto 10px auto; border:0;">
-      </a>
-      <p style="font-size:15px; color:#475569; margin:12px 0 0;">Your feedback keeps the <strong>SecondHandCell</strong> community thriving.</p>
-    </div>
-  `;
-}
-function buildCountdownNoticeHtml() {
-  return `
-    <div style="margin-top: 24px; padding: 18px 20px; background-color: #ecfdf5; border-radius: 12px; border: 1px solid #bbf7d0; color: #065f46; font-size: 17px; line-height: 1.6;">
-      <strong style="display:block; font-size:18px; margin-bottom:8px;">Friendly reminder</strong>
-      If we don't hear back, we may finalize your device at <strong>75% less</strong> to keep your order moving.
-    </div>
-  `;
-}
-function escapeHtml(text2) {
-  const map = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  };
-  return text2.replace(/[&<>"']/g, (m) => map[m]);
-}
-function buildEmailLayout({
-  title = "",
-  bodyHtml = "",
-  accentColor = "#16a34a",
-  includeTrustpilot = true,
-  footerText = "Need help? Reply to this email or call (347) 688-0662.",
-  includeCountdownNotice = false
-} = {}) {
-  const headingSection = title ? `
-        <tr>
-          <td style="background:${accentColor}; padding: 30px 24px; text-align:center;">
-            <h1 style="margin:0; font-size:28px; line-height:1.3; color:#ffffff; font-weight:700;">${escapeHtml(
-    title
-  )}</h1>
-          </td>
-        </tr>
-      ` : "";
-  const trustpilotSection = includeTrustpilot ? buildTrustpilotSection() : "";
-  const countdownSection = includeCountdownNotice ? buildCountdownNoticeHtml() : "";
-  return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${escapeHtml(title || "SecondHandCell Update")}</title>
-      <style>
-        body { background-color:#f1f5f9; margin:0; padding:24px 12px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#0f172a; }
-        .email-shell { width:100%; max-width:640px; margin:0 auto; background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 25px 45px rgba(15,23,42,0.08); border:1px solid #e2e8f0; }
-        .logo-cell { padding:28px 0 16px; text-align:center; background-color:#ffffff; }
-        .logo-cell img { height:56px; width:auto; }
-        .content-cell { padding:32px 30px; font-size:17px; line-height:1.75; }
-        .content-cell p { margin:0 0 20px; }
-        .footer-cell { padding:28px 32px; text-align:center; font-size:15px; color:#475569; background-color:#f8fafc; border-top:1px solid #e2e8f0; }
-        .footer-cell p { margin:4px 0; }
-        a.button-link { display:inline-block; padding:14px 26px; border-radius:9999px; background-color:#16a34a; color:#ffffff !important; font-weight:600; text-decoration:none; font-size:17px; }
-      </style>
-    </head>
-    <body>
-      <table role="presentation" cellpadding="0" cellspacing="0" class="email-shell">
-        <tr>
-          <td class="logo-cell">
-            <img src="${EMAIL_LOGO_URL}" alt="SecondHandCell Logo" />
-          </td>
-        </tr>
-        ${headingSection}
-        <tr>
-          <td class="content-cell">
-            ${bodyHtml}
-            ${countdownSection}
-          </td>
-        </tr>
-        ${trustpilotSection ? `<tr><td>${trustpilotSection}</td></tr>` : ""}
-        <tr>
-          <td class="footer-cell">
-            <p>${footerText}</p>
-            <p>\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} SecondHandCell. All rights reserved.</p>
-          </td>
-        </tr>
-      </table>
-    </body>
-    </html>
-  `;
-}
-var SHIPPING_LABEL_EMAIL_HTML = buildEmailLayout({
-  title: "Your Shipping Label is Ready!",
-  bodyHtml: `
-      <p>Hi **CUSTOMER_NAME**,</p>
-      <p>Your shipping label for order <strong>#**ORDER_ID**</strong> is ready to go.</p>
-      <p style="margin-bottom:28px;">Use the secure button below to download it instantly and get your device on the way to us.</p>
-      <div style="text-align:center; margin-bottom:32px;">
-        <a href="**LABEL_DOWNLOAD_LINK**" class="button-link">Download Shipping Label</a>
-      </div>
-      <div style="background:#f8fafc; border:1px solid #dbeafe; border-radius:14px; padding:20px 24px;">
-        <p style="margin:0 0 10px;"><strong style="color:#0f172a;">Tracking Number</strong><br><span style="color:#2563eb; font-weight:600;">**TRACKING_NUMBER**</span></p>
-        <p style="margin:0; color:#475569;">Drop your device off with your preferred carrier as soon as you're ready.</p>
-      </div>
-      <p style="margin-top:28px;">Need a hand? Reply to this email and our team will guide you.</p>
-  `
-});
-var SHIPPING_KIT_EMAIL_HTML = buildEmailLayout({
-  title: "Your Shipping Kit is on its Way!",
-  bodyHtml: `
-      <p>Hi **CUSTOMER_NAME**,</p>
-      <p>Your shipping kit for order <strong>#**ORDER_ID**</strong> is en route.</p>
-      <p>Track its journey with the number below and get ready to pop your device inside once it arrives.</p>
-      <div style="background:#f8fafc; border:1px solid #dbeafe; border-radius:14px; padding:20px 24px; margin:0 0 28px;">
-        <p style="margin:0 0 10px;"><strong style="color:#0f172a;">Tracking Number</strong><br><span style="color:#2563eb; font-weight:600;">**TRACKING_NUMBER**</span></p>
-        <p style="margin:0; color:#475569;">Keep an eye out for your kit and pack your device securely when it lands.</p>
-      </div>
-      <p>Have accessories you don't need? Feel free to include them\u2014we'll recycle responsibly.</p>
-      <p>Need anything else? Just reply to this email.</p>
-  `
-});
-var ORDER_RECEIVED_EMAIL_HTML = buildEmailLayout({
-  title: "We've received your order!",
-  bodyHtml: `
-      <p>Hi **CUSTOMER_NAME**,</p>
-      <p>Thanks for choosing SecondHandCell! We've logged your order for <strong>**DEVICE_NAME**</strong>.</p>
-      <p>Your order ID is <strong style="color:#2563eb;">#**ORDER_ID**</strong>. Keep it handy for any questions.</p>
-      <h2 style="font-size:20px; color:#0f172a; margin:32px 0 12px;">Before you ship</h2>
-      <ul style="padding-left:22px; margin:0 0 20px; color:#475569;">
-        <li style="margin-bottom:10px;"><strong>Backup your data</strong> so nothing personal is lost.</li>
-        <li style="margin-bottom:10px;"><strong>Factory reset</strong> the device to wipe personal info.</li>
-        <li style="margin-bottom:10px;"><strong>Remove accounts</strong> such as Apple ID/iCloud or Google/Samsung accounts.<br><span style="display:block; margin-top:6px; margin-left:10px;">\u2022 Turn off Find My iPhone (FMI).<br>\u2022 Disable Factory Reset Protection (FRP) on Android.</span></li>
-        <li style="margin-bottom:10px;"><strong>Remove SIM cards</strong> and eSIM profiles.</li>
-        <li style="margin-bottom:10px;"><strong>Pack accessories separately</strong> unless we specifically request them.</li>
-      </ul>
-      <div style="background:#fef3c7; border-radius:16px; padding:18px 22px; border:1px solid #fde68a; color:#92400e; margin:30px 0;">
-        <strong>Important:</strong> We can't process devices that still have FMI/FRP enabled, an outstanding balance, or a blacklist/lost/stolen status.
-      </div>
-      **SHIPPING_INSTRUCTION**
-  `
-});
-var DEVICE_RECEIVED_EMAIL_HTML = buildEmailLayout({
-  title: "Your device has arrived!",
-  bodyHtml: `
-      <p>Hi **CUSTOMER_NAME**,</p>
-      <p>Your device for order <strong style="color:#2563eb;">#**ORDER_ID**</strong> has landed at our facility.</p>
-      <p>Our technicians are giving it a full inspection now. We'll follow up shortly with an update on your payout.</p>
-      <p>Have questions while you wait? Just reply to this email\u2014real humans are here to help.</p>
-  `
-});
-var ORDER_PLACED_ADMIN_EMAIL_HTML = buildEmailLayout({
-  title: "New order submitted",
-  accentColor: "#f97316",
-  bodyHtml: `
-      <p>Heads up! A new order just came in.</p>
-      <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:16px; padding:22px 24px; margin-bottom:28px; color:#7c2d12;">
-        <p style="margin:0 0 10px;"><strong>Customer</strong>: **CUSTOMER_NAME**</p>
-        <p style="margin:0 0 10px;"><strong>Order ID</strong>: #**ORDER_ID**</p>
-        <p style="margin:0 0 10px;"><strong>Device</strong>: **DEVICE_NAME**</p>
-        <p style="margin:0;"><strong>Estimated Quote</strong>: $**ESTIMATED_QUOTE** \u2022 <strong>Shipping</strong>: **SHIPPING_PREFERENCE**</p>
-      </div>
-      <div style="text-align:center; margin-bottom:20px;">
-        <a href="https://secondhandcell.com/admin" class="button-link" style="background-color:#f97316;">Open in Admin</a>
-      </div>
-      <p style="color:#475569;">This alert is automated\u2014feel free to reply if you notice anything unusual.</p>
-  `
-});
-var BLACKLISTED_EMAIL_HTML = buildEmailLayout({
-  title: "Action required: Carrier blacklist detected",
-  accentColor: "#dc2626",
-  includeCountdownNotice: true,
-  includeTrustpilot: false,
-  bodyHtml: `
-      <p>Hi **CUSTOMER_NAME**,</p>
-      <p>During our review of order <strong>#**ORDER_ID**</strong>, the carrier database flagged the device as lost, stolen, or blacklisted.</p>
-      <p>We can't release payment while this status is active. Please contact your carrier to remove the flag and reply with confirmation or documentation so we can re-run the check.</p>
-      <p>If you believe this alert is an error, include any proof in your reply and we'll take another look.</p>
-      <div style="color:#dc2626; font-size:15px; line-height:1.6;">
-        <p style="margin: 0 0 16px;">State and local law require us to hold devices that test positive for a lost, stolen, or blacklisted status. Key regulations include:</p>
-        <ul style="margin: 0 0 16px; padding-left: 20px;">
-          <li><strong>New York Penal Law \xA7\xA7 155.05(2)(b) &amp; 165.40\u2013165.54:</strong> Buying or possessing property that is reported lost or stolen can constitute larceny or criminal possession of stolen property.</li>
-          <li><strong>New York City Administrative Code \xA7\xA7 20-272 &amp; 20-273:</strong> Secondhand dealers must record every transaction, report suspicious items to the NYPD, and hold flagged goods for law enforcement review.</li>
-          <li><strong>New York General Business Law Article 6:</strong> Requires detailed recordkeeping and prohibits resale of devices until legal status issues are resolved.</li>
-        </ul>
-        <p style="margin: 0;">We will continue to cooperate with law enforcement and cannot release the device back to you unless they authorize it. For more information, review our <a href="https://secondhandcell.com/terms.html" style="color:#2563eb;">Terms &amp; Conditions</a> or reply with documentation clearing the device so we can re-run the check.</p>
-      </div>
-  `
-});
-var FMI_EMAIL_HTML = buildEmailLayout({
-  title: "Turn off Find My to continue",
-  accentColor: "#f59e0b",
-  includeCountdownNotice: true,
-  includeTrustpilot: false,
-  bodyHtml: `
-      <p>Hi **CUSTOMER_NAME**,</p>
-      <p>Our inspection for order <strong>#**ORDER_ID**</strong> shows Find My iPhone / Activation Lock is still enabled.</p>
-      <p>Please complete the steps below so we can finish processing your payout:</p>
-      <ol style="padding-left:22px; color:#475569; margin-bottom:20px;">
-        <li>Visit <a href="https://icloud.com/find" target="_blank" style="color:#2563eb;">icloud.com/find</a> and sign in.</li>
-        <li>Select the device you're selling.</li>
-        <li>Choose "Remove from Account".</li>
-        <li>Confirm the device no longer appears in your list.</li>
-      </ol>
-      <div style="text-align:center; margin:32px 0 24px;">
-        <a href="**CONFIRM_URL**" class="button-link" style="background-color:#f59e0b;">I've turned off Find My</a>
-      </div>
-      <p style="color:#b45309; font-size:15px;">Once it's disabled, click the button above or reply to this email so we can recheck your device.</p>
-  `
-});
-var BAL_DUE_EMAIL_HTML = buildEmailLayout({
-  title: "Balance due with your carrier",
-  accentColor: "#f97316",
-  includeCountdownNotice: true,
-  includeTrustpilot: false,
-  bodyHtml: `
-      <p>Hi **CUSTOMER_NAME**,</p>
-      <p>When we ran your device for order <strong>#**ORDER_ID**</strong>, the carrier reported a status of <strong>**FINANCIAL_STATUS**</strong>.</p>
-      <p>Please contact your carrier to clear the balance and then reply to this email so we can rerun the check and keep your payout on track.</p>
-      <p style="color:#c2410c;">Need help figuring out the right department to call? Let us know and we'll point you in the right direction.</p>
-  `
-});
-var DOWNGRADE_EMAIL_HTML = buildEmailLayout({
-  title: "Order finalized at adjusted payout",
-  accentColor: "#f97316",
-  includeTrustpilot: false,
-  bodyHtml: `
-      <p>Hi **CUSTOMER_NAME**,</p>
-      <p>We reached out about the issue with your device for order <strong>#**ORDER_ID**</strong> but haven't received an update.</p>
-      <p>To keep things moving, we've finalized the device at 75% less than the original offer. If you resolve the issue, reply to this email and we'll happily re-evaluate.</p>
-      <p>We're here to help\u2014just let us know how you'd like to proceed.</p>
-  `
-});
-function getOrderCompletedEmailTemplate({ includeTrustpilot = true } = {}) {
-  return buildEmailLayout({
-    title: "\u{1F973} Your order is complete!",
-    includeTrustpilot,
-    bodyHtml: `
-        <p>Hi **CUSTOMER_NAME**,</p>
-        <p>Great news! Order <strong>#**ORDER_ID**</strong> is complete and your payout is headed your way.</p>
-        <div style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:20px 24px; margin:28px 0;">
-          <p style="margin:0 0 12px;"><strong style="color:#0f172a;">Device</strong><br><span style="color:#475569;">**DEVICE_SUMMARY**</span></p>
-          <p style="margin:0 0 12px;"><strong style="color:#0f172a;">Payout</strong><br><span style="color:#059669; font-size:22px; font-weight:700;">$**ORDER_TOTAL**</span></p>
-          <p style="margin:0;"><strong style="color:#0f172a;">Payment method</strong><br><span style="color:#475569;">**PAYMENT_METHOD**</span></p>
-        </div>
-        <p>Thanks for choosing SecondHandCell!</p>
-    `
-  });
-}
-var REVIEW_REQUEST_EMAIL_HTML = buildEmailLayout({
-  title: "We'd love your feedback",
-  accentColor: "#0ea5e9",
-  bodyHtml: `
-      <p>Hello **CUSTOMER_NAME**,</p>
-      <p>Thanks again for trusting us with your device. Sharing a quick review helps other sellers feel confident working with SecondHandCell.</p>
-      <p style="margin-bottom:32px;">It only takes a minute and means the world to our team.</p>
-      <div style="text-align:center; margin-bottom:24px;">
-        <a href="${TRUSTPILOT_REVIEW_LINK}" class="button-link" style="background-color:#0ea5e9;">Leave a Trustpilot review</a>
-      </div>
-      <p style="text-align:center; color:#475569;">Thank you for being part of the SecondHandCell community!</p>
-  `
-});
-var EMAIL_TEMPLATES = {
-  SHIPPING_LABEL: {
-    subject: "Your SecondHandCell Shipping Label for Order #**ORDER_ID**",
-    html: SHIPPING_LABEL_EMAIL_HTML
-  },
-  SHIPPING_KIT: {
-    subject: "Your SecondHandCell Shipping Kit for Order #**ORDER_ID** is on its Way!",
-    html: SHIPPING_KIT_EMAIL_HTML
-  },
-  ORDER_RECEIVED: {
-    subject: "Order Confirmation #**ORDER_ID** - SecondHandCell",
-    html: ORDER_RECEIVED_EMAIL_HTML
-  },
-  DEVICE_RECEIVED: {
-    subject: "Your Device Has Arrived - Order #**ORDER_ID**",
-    html: DEVICE_RECEIVED_EMAIL_HTML
-  },
-  ORDER_PLACED_ADMIN: {
-    subject: "New Order Submitted - #**ORDER_ID**",
-    html: ORDER_PLACED_ADMIN_EMAIL_HTML
-  },
-  BLACKLISTED: {
-    subject: "Important Notice Regarding Your Device for Order #**ORDER_ID**",
-    html: BLACKLISTED_EMAIL_HTML
-  },
-  FMI_ACTIVE: {
-    subject: "Action Required: Turn Off Find My iPhone - Order #**ORDER_ID**",
-    html: FMI_EMAIL_HTML
-  },
-  BALANCE_DUE: {
-    subject: "Action Required: Outstanding Balance Detected - Order #**ORDER_ID**",
-    html: BAL_DUE_EMAIL_HTML
-  },
-  DOWNGRADE: {
-    subject: "Order Update - Adjusted Payout for #**ORDER_ID**",
-    html: DOWNGRADE_EMAIL_HTML
-  },
-  ORDER_COMPLETED: {
-    subject: "Your Payout is on the Way! - Order #**ORDER_ID**",
-    getHtml: getOrderCompletedEmailTemplate
-  },
-  REVIEW_REQUEST: {
-    subject: "How was your experience with SecondHandCell?",
-    html: REVIEW_REQUEST_EMAIL_HTML
-  }
-};
-function replaceEmailVariables(template, variables) {
-  let result = template;
-  for (const [key, value] of Object.entries(variables)) {
-    const regex = new RegExp(`\\*\\*${key}\\*\\*`, "g");
-    result = result.replace(regex, value || "");
-  }
-  return result;
-}
-
-// server/routes/emails.ts
 function createEmailsRouter() {
-  const router = Router();
-  router.post("/send-email", async (req, res) => {
+  const router2 = Router();
+  router2.post("/send-email", async (req, res) => {
     try {
       const { to, bcc, subject, html } = req.body || {};
       if (!to || !subject || !html) {
@@ -1442,7 +1664,7 @@ function createEmailsRouter() {
       res.status(500).json({ error: "Failed to send email." });
     }
   });
-  router.post("/test-emails", async (req, res) => {
+  router2.post("/test-emails", async (req, res) => {
     const { email, emailTypes } = req.body || {};
     if (!email || !emailTypes || !Array.isArray(emailTypes)) {
       return res.status(400).json({ error: "Email and emailTypes array are required." });
@@ -1486,7 +1708,7 @@ function createEmailsRouter() {
       res.status(500).json({ error: `Failed to send test emails: ${error.message}` });
     }
   });
-  router.post("/orders/:id/send-condition-email", async (req, res) => {
+  router2.post("/orders/:id/send-condition-email", async (req, res) => {
     try {
       const { reason, notes, label: labelText } = req.body || {};
       const orderId = req.params.id;
@@ -1496,7 +1718,7 @@ function createEmailsRouter() {
       res.status(500).json({ error: "Failed to send condition email." });
     }
   });
-  router.post("/orders/:id/fmi-cleared", async (req, res) => {
+  router2.post("/orders/:id/fmi-cleared", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "FMI status updated successfully." });
@@ -1505,7 +1727,7 @@ function createEmailsRouter() {
       res.status(500).json({ error: "Failed to clear FMI status" });
     }
   });
-  return router;
+  return router2;
 }
 
 // server/routes/imei.ts
@@ -1638,9 +1860,11 @@ function isSamsungDeviceHint(...values) {
 }
 
 // server/routes/imei.ts
+init_email();
+init_emailTemplates();
 function createImeiRouter() {
-  const router = Router2();
-  router.post("/check-esn", async (req, res) => {
+  const router2 = Router2();
+  router2.post("/check-esn", async (req, res) => {
     const {
       imei,
       orderId,
@@ -1754,7 +1978,7 @@ function createImeiRouter() {
       res.status(500).json({ error: "Failed to perform IMEI check." });
     }
   });
-  return router;
+  return router2;
 }
 
 // server/routes/labels.ts
@@ -1820,6 +2044,8 @@ async function createShipStationLabel(fromAddress, toAddress, carrierCode, servi
 }
 
 // server/routes/labels.ts
+init_email();
+init_emailTemplates();
 var SHC_RECEIVING_ADDRESS = {
   name: "SHC",
   company: "SecondHandCell",
@@ -1832,8 +2058,8 @@ var SHC_RECEIVING_ADDRESS = {
   country: "US"
 };
 function createLabelsRouter() {
-  const router = Router3();
-  router.post("/generate-label/:id", async (req, res) => {
+  const router2 = Router3();
+  router2.post("/generate-label/:id", async (req, res) => {
     try {
       const orderId = req.params.id;
       const order = {
@@ -1932,7 +2158,7 @@ function createLabelsRouter() {
       res.status(500).json({ error: "Failed to generate label" });
     }
   });
-  router.post("/orders/:id/return-label", async (req, res) => {
+  router2.post("/orders/:id/return-label", async (req, res) => {
     try {
       const orderId = req.params.id;
       const order = {
@@ -1985,16 +2211,35 @@ function createLabelsRouter() {
       res.status(500).json({ error: "Failed to generate return label" });
     }
   });
-  return router;
+  return router2;
 }
 
 // server/routes/orders.ts
 import { Router as Router4 } from "express";
 import bcrypt from "bcrypt";
 import { z } from "zod";
+router.get("/label/:orderNumber", async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const order = await storage.getOrderByNumber(orderNumber);
+    if (!order) return res.status(404).send("Order not found");
+    const shipments2 = await storage.getShipmentsByOrderId(order.id);
+    if (!shipments2.length || !shipments2[0].shippingLabelUrl) {
+      return res.status(404).send("No label found for this order");
+    }
+    const { shipEngineService: shipEngineService2 } = (init_shipengine(), __toCommonJS(shipengine_exports));
+    const pdfBuffer = await shipEngineService2.downloadLabelPdf(shipments2[0].shippingLabelUrl);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=ShippingLabel-${orderNumber}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Error downloading label PDF:", error);
+    res.status(500).send("Failed to download label PDF");
+  }
+});
 function createOrdersRouter() {
-  const router = Router4();
-  router.post("/fetch-pdf", async (req, res) => {
+  const router2 = Router4();
+  router2.post("/fetch-pdf", async (req, res) => {
     try {
       const { url } = req.body;
       res.json({ message: "PDF fetched successfully" });
@@ -2003,7 +2248,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to fetch PDF" });
     }
   });
-  router.get("/orders", async (req, res) => {
+  router2.get("/orders", async (req, res) => {
     try {
       res.json({ orders: [] });
     } catch (error) {
@@ -2011,7 +2256,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
-  router.get("/orders/needs-printing", async (req, res) => {
+  router2.get("/orders/needs-printing", async (req, res) => {
     try {
       res.json({ orders: [] });
     } catch (error) {
@@ -2019,7 +2264,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
-  router.post("/orders/needs-printing/bundle", async (req, res) => {
+  router2.post("/orders/needs-printing/bundle", async (req, res) => {
     try {
       res.json({ message: "Print bundle created" });
     } catch (error) {
@@ -2027,7 +2272,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to create print bundle" });
     }
   });
-  router.post("/merge-print", async (req, res) => {
+  router2.post("/merge-print", async (req, res) => {
     try {
       const { orderIds } = req.body;
       res.json({ message: "PDFs merged successfully" });
@@ -2036,7 +2281,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to merge PDFs" });
     }
   });
-  router.get("/merge-print/:orderIds", async (req, res) => {
+  router2.get("/merge-print/:orderIds", async (req, res) => {
     try {
       const { orderIds } = req.params;
       res.json({ message: "Merged print generated" });
@@ -2045,7 +2290,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to generate merged print" });
     }
   });
-  router.get("/orders/:id", async (req, res) => {
+  router2.get("/orders/:id", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ order: null });
@@ -2054,7 +2299,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Order not found" });
     }
   });
-  router.get("/orders/find", async (req, res) => {
+  router2.get("/orders/find", async (req, res) => {
     try {
       const { trackingNumber, email, orderId } = req.query;
       res.json({ orders: [] });
@@ -2063,7 +2308,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to find orders" });
     }
   });
-  router.get("/orders/by-user/:userId", async (req, res) => {
+  router2.get("/orders/by-user/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
       res.json({ orders: [] });
@@ -2072,7 +2317,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to fetch user orders" });
     }
   });
-  router.post("/submit-order", async (req, res) => {
+  router2.post("/submit-order", async (req, res) => {
     try {
       const OrderSchema = z.object({
         customerInfo: z.object({
@@ -2132,7 +2377,7 @@ function createOrdersRouter() {
       const taxAmount = 0;
       const discountAmount = 0;
       const total = subtotal + shippingCost + taxAmount - discountAmount;
-      const orderNumber = `SL-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+      const orderNumber = await storage.getNextOrderNumber();
       const order = await storage.createOrder({
         orderNumber,
         companyId: guestCompany.id,
@@ -2185,8 +2430,9 @@ function createOrdersRouter() {
           lineTotal: d.price * (d.quantity ?? 1)
         });
       }
+      let savedShippingAddress;
       if (shippingAddress) {
-        await storage.createShippingAddress({
+        savedShippingAddress = await storage.createShippingAddress({
           companyId: guestCompany.id,
           contactName: shippingAddress.contactName || customerInfo.name || customerInfo.email,
           phone: shippingAddress.phone || customerInfo.phone || "",
@@ -2199,13 +2445,62 @@ function createOrdersRouter() {
           isDefault: true
         });
       }
+      const { shipEngineService: shipEngineService2 } = (init_shipengine(), __toCommonJS(shipengine_exports));
+      const { sendOrderConfirmationEmail: sendOrderConfirmationEmail2 } = (init_email(), __toCommonJS(email_exports));
+      let labelPdfBuffer = null;
+      let trackingNumber = null;
+      let trackingUrl = null;
+      if (shippingAddress) {
+        try {
+          const labelResponse = await shipEngineService2.createLabel({
+            shipTo: {
+              name: shippingAddress.contactName || customerInfo.name,
+              phone: shippingAddress.phone || customerInfo.phone,
+              street1: shippingAddress.street1,
+              street2: shippingAddress.street2,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              postalCode: shippingAddress.postalCode,
+              country: "US"
+            }
+          });
+          trackingNumber = labelResponse.tracking_number;
+          trackingUrl = `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+          await storage.createShipment({
+            orderId: order.id,
+            carrier: labelResponse.carrier_code || "USPS",
+            serviceLevel: labelResponse.service_code || "usps_priority_mail",
+            trackingNumber,
+            shippingLabelUrl: labelResponse.label_download?.pdf || labelResponse.label_download?.href
+          });
+          if (labelResponse.label_download?.pdf) {
+            labelPdfBuffer = await shipEngineService2.downloadLabelPdf(labelResponse.label_download.pdf);
+          }
+          console.log("[Order] ShipEngine label created:", {
+            orderId: order.id,
+            trackingNumber,
+            labelUrl: labelResponse.label_download?.pdf
+          });
+        } catch (error) {
+          console.error("[Order] Failed to create ShipEngine label:", error);
+        }
+      }
+      await sendOrderConfirmationEmail2({
+        to: customerInfo.email,
+        order,
+        orderNumber,
+        labelPdf: labelPdfBuffer,
+        trackingNumber,
+        trackingUrl,
+        shippingAddress
+      });
       return res.json({ orderNumber, order });
     } catch (error) {
       console.error("Error submitting order:", error);
       res.status(500).json({ error: "Failed to submit order", details: error.message });
     }
   });
-  router.get("/promo-codes/:code", async (req, res) => {
+  router2.get("/promo-codes/:code", async (req, res) => {
     try {
       const { code } = req.params;
       res.json({ valid: false });
@@ -2214,7 +2509,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Promo code not found" });
     }
   });
-  router.post("/generate-label/:id", async (req, res) => {
+  router2.post("/generate-label/:id", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "Label generated successfully" });
@@ -2223,7 +2518,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to generate label" });
     }
   });
-  router.post("/orders/:id/void-label", async (req, res) => {
+  router2.post("/orders/:id/void-label", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "Label voided successfully" });
@@ -2232,7 +2527,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to void label" });
     }
   });
-  router.get("/packing-slip/:id", async (req, res) => {
+  router2.get("/packing-slip/:id", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "Packing slip generated" });
@@ -2241,7 +2536,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to generate packing slip" });
     }
   });
-  router.get("/print-bundle/:id", async (req, res) => {
+  router2.get("/print-bundle/:id", async (req, res) => {
     try {
       const { id } = req.params;
       res.json({ message: "Print bundle generated" });
@@ -2250,7 +2545,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Failed to generate print bundle" });
     }
   });
-  router.post("/repair-label-generated", async (req, res) => {
+  router2.post("/repair-label-generated", async (req, res) => {
     try {
       res.json({ processedCount: 0, updatedCount: 0 });
     } catch (error) {
@@ -2258,7 +2553,7 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Unable to repair label-generated orders" });
     }
   });
-  router.post("/orders/repair-label-generated", async (req, res) => {
+  router2.post("/orders/repair-label-generated", async (req, res) => {
     try {
       res.json({ processedCount: 0, updatedCount: 0 });
     } catch (error) {
@@ -2266,14 +2561,14 @@ function createOrdersRouter() {
       res.status(500).json({ error: "Unable to repair label-generated orders" });
     }
   });
-  return router;
+  return router2;
 }
 
 // server/routes/webhook.ts
 import { Router as Router5 } from "express";
 import crypto2 from "crypto";
 function createWebhookRouter() {
-  const router = Router5();
+  const router2 = Router5();
   const verifyShipStationSignature = (req, res, next) => {
     const signature = req.headers["x-shipstation-signature"];
     const secret = process.env.SHIPSTATION_WEBHOOK_SECRET;
@@ -2299,7 +2594,7 @@ function createWebhookRouter() {
     }
     next();
   };
-  router.post("/webhook/shipstation", verifyShipStationSignature, async (req, res) => {
+  router2.post("/webhook/shipstation", verifyShipStationSignature, async (req, res) => {
     try {
       const event = req.body;
       console.log("Received ShipStation webhook event:", event);
@@ -2309,7 +2604,7 @@ function createWebhookRouter() {
       res.status(500).send("Failed to process webhook");
     }
   });
-  return router;
+  return router2;
 }
 
 // server/routes.ts
@@ -3207,7 +3502,7 @@ async function registerRoutes(app2) {
         if (!devices || !Array.isArray(devices) || devices.length === 0) {
           return res.status(400).json({ error: "At least one device is required" });
         }
-        const orderNumber2 = `SL-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+        const orderNumber2 = await storage.getNextOrderNumber();
         let total2 = 0;
         devices.forEach((device) => {
           total2 += parseFloat(device.price || device.amount || 0) * (device.quantity || 1);

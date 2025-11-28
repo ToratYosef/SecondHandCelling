@@ -1,14 +1,3 @@
-  // Progress bar steps
-  const steps = [
-    { key: 'brand', label: 'Brand' },
-    { key: 'model', label: 'Model' },
-    { key: 'questions', label: 'Questions' },
-    { key: 'quote', label: 'Quote' },
-    { key: 'shipping', label: 'Shipping' },
-    { key: 'payment', label: 'Payment' },
-    { key: 'confirmed', label: 'Confirmed' },
-  ];
-  const currentStepIndex = steps.findIndex(s => s.key === step);
 import { PublicHeader } from "@/components/PublicHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { Card } from "@/components/ui/card";
@@ -49,6 +38,18 @@ type DeviceModel = {
 export default function Sell() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState<'brand' | 'model' | 'questions' | 'quote' | 'shipping' | 'payment' | 'confirmed'>('brand');
+  
+  // Progress bar steps
+  const steps = [
+    { key: 'brand', label: 'Brand' },
+    { key: 'model', label: 'Model' },
+    { key: 'questions', label: 'Questions' },
+    { key: 'quote', label: 'Quote' },
+    { key: 'shipping', label: 'Shipping' },
+    { key: 'payment', label: 'Payment' },
+    { key: 'confirmed', label: 'Confirmed' },
+  ];
+  const currentStepIndex = steps.findIndex(s => s.key === step);
   
   // Selection state
   const [selectedBrand, setSelectedBrand] = useState<string>("");
@@ -187,19 +188,20 @@ export default function Sell() {
           <div className="w-full px-4 pt-4">
             <div className="flex items-center gap-2 mb-6">
               {steps.map((s, idx) => (
-                <div key={s.key} className="flex-1 flex flex-col items-center">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${idx <= currentStepIndex ? 'bg-primary' : 'bg-muted'}`}
-                  >
-                    {idx + 1}
+                <div key={s.key} className="flex items-center">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${idx <= currentStepIndex ? 'bg-primary' : 'bg-muted'}`}
+                    >
+                      {idx + 1}
+                    </div>
+                    <span className={`text-xs mt-1 ${idx === currentStepIndex ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>{s.label}</span>
                   </div>
-                  <span className={`text-xs mt-1 ${idx === currentStepIndex ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>{s.label}</span>
+                  {idx < steps.length - 1 && (
+                    <div className={`h-1 w-8 ${idx < currentStepIndex ? 'bg-primary' : 'bg-muted'} rounded-full mx-1`} />
+                  )}
                 </div>
-                )).reduce((prev, curr, idx) => [
-                  prev,
-                  idx < steps.length - 1 ? <div key={`bar-${idx}`} className={`h-1 w-8 ${idx < currentStepIndex ? 'bg-primary' : 'bg-muted'} rounded-full mx-1`} /> : null,
-                  curr
-                ])}
+              ))}
             </div>
           </div>
 
