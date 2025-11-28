@@ -208,18 +208,27 @@ export function createOrdersRouter() {
 
       // Create order items
       for (const d of devices) {
-        // Map modelId to deviceVariantId if needed
-        const deviceVariantId = d.modelId; // assuming modelId is variant id in this data
+        // Resolve a real device variant for this model/storage/carrier
+        const variants = await storage.getDeviceVariantsByModelId(d.modelId);
+        const match = variants.find(v => (
+          (!d.storage || v.storage === d.storage) &&
+          (!d.carrier || v.carrier === d.carrier)
+        )) || variants[0];
+
+        if (!match) {
+          throw new Error(`No device variant found for model ${d.modelId}`);
+        }
+
         await storage.createOrderItem({
           orderId: order.id,
-          deviceVariantId,
+          deviceVariantId: match.id,
           quantity: d.quantity ?? 1,
           unitPrice: d.price,
           lineTotal: d.price * (d.quantity ?? 1),
         } as any);
         console.log('Created order item payload:', {
           orderId: order.id,
-          deviceVariantId,
+          deviceVariantId: match.id,
           quantity: d.quantity ?? 1,
           unitPrice: d.price,
           lineTotal: d.price * (d.quantity ?? 1),
