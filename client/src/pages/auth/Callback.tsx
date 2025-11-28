@@ -22,10 +22,25 @@ export default function AuthCallback() {
         if (!res.ok) {
           throw new Error("Auth callback failed");
         }
-        setLocation("/sell");
+        // If opened as a popup, notify opener and close
+        if (window.opener) {
+          try {
+            window.opener.postMessage({ type: "stack-auth:success" }, "*");
+          } catch {}
+          window.close();
+        } else {
+          setLocation("/sell");
+        }
       } catch (e) {
         console.error(e);
-        setLocation("/sell");
+        if (window.opener) {
+          try {
+            window.opener.postMessage({ type: "stack-auth:success" }, "*");
+          } catch {}
+          window.close();
+        } else {
+          setLocation("/sell");
+        }
       }
     }
 

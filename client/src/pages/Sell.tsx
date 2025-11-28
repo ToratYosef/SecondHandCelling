@@ -859,6 +859,11 @@ export default function Sell() {
         <AuthPrompt
           onClose={() => setShowAuthPrompt(false)}
           onContinueGuest={handleContinueAsGuest}
+          onAuthSuccess={() => {
+            setShowAuthPrompt(false);
+            setStep('shipping');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
       )}
 
