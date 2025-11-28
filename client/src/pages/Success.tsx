@@ -10,11 +10,12 @@ import { getApiUrl } from "@/lib/api";
 
 export default function Success() {
   const [, setLocation] = useLocation();
-  const searchParams = new URLSearchParams(useSearch() || "");
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString || "");
   const orderNumber = searchParams.get('order');
 
   // Fetch order details to get shipment info
-  const { data: order, isLoading } = useQuery({
+  const { data: order, isLoading, error } = useQuery({
     queryKey: ['/api/orders/by-number', orderNumber],
     queryFn: async () => {
       if (!orderNumber) throw new Error('No order number');
@@ -23,6 +24,7 @@ export default function Success() {
       return res.json();
     },
     enabled: !!orderNumber,
+    retry: false,
   });
 
   useEffect(() => {
@@ -60,11 +62,27 @@ export default function Success() {
     );
   }
 
-  const deviceName = order?.items?.[0]?.deviceModel?.name || 'Your device';
-  const storageRaw = order?.items?.[0]?.deviceVariant?.storageGb ?? order?.items?.[0]?.deviceVariant?.storage;
-  const storage = storageRaw ? `${storageRaw}GB` : '';
-  const offerAmount = typeof order?.totalOriginalOffer === 'number' ? order?.totalOriginalOffer : (typeof order?.total === 'number' ? order?.total : 0);
-  const shipment = order?.shipments?.[0];
+  if (error || !order) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <PublicHeader />
+        <main className="flex-1 flex items-center justify-center p-4">
+          <Card className="p-8 text-center max-w-md">
+            <p className="text-muted-foreground mb-4">Order not found</p>
+            <Button onClick={() => setLocation('/')}>Return Home</Button>
+          </Card>
+        </main>
+        <PublicFooter />
+      </div>
+    );
+  }
+
+  const firstItem = order.items?.[0];
+  const deviceName = firstItem?.deviceModel?.name || 'Your device';
+  const storageRaw = firstItem?.deviceVariant?.storageGb ?? firstItem?.deviceVariant?.storage;
+  const storage = storageRaw ? String(storageRaw) : '';
+  const offerAmount = typeof order.totalOriginalOffer === 'number' ? order.totalOriginalOffer : (typeof order.total === 'number' ? order.total : 0);
+  const shipment = order.shipments?.[0] || null;
 
   // Debug logging
   console.log('[Success] Order:', order?.id);
@@ -107,13 +125,13 @@ export default function Success() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Device:</span>
                   <span className="font-medium">
-                    {deviceName} {storage && `(${storage})`}
+                    {deviceName} {storage ? `(${storage}GB)` : ''}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Offer Amount:</span>
                   <span className="font-bold text-primary text-xl">
-                    ${typeof offerAmount === 'number' ? offerAmount.toFixed(2) : parseFloat(offerAmount || '0').toFixed(2)}
+                    ${offerAmount.toFixed(2)}
                   </span>
                 </div>
               </div>
