@@ -80,6 +80,7 @@ export default function Sell() {
   const [showRejectionDialog, setShowRejectionDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: brands = [] } = useQuery<DeviceBrand[]>({
     queryKey: ["/api/brands"],

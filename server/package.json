@@ -8,6 +8,7 @@
     "build": "esbuild index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "seed": "NODE_ENV=development tsx seed.ts",
+    "seed:admin": "NODE_ENV=development tsx scripts/seed-admin.ts",
     "unseed": "NODE_ENV=development tsx scripts/unseed.ts",
     "test": "jest --runInBand"
   },
