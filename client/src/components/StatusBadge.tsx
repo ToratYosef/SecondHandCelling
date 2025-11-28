@@ -11,9 +11,11 @@ type StatusVariant =
   | "in_transit"
   | "received"
   | "under_inspection"
+  | "reoffer_sent"
   | "reoffer_pending"
   | "customer_decision_pending"
   | "payout_pending"
+  | "pending_payment"
   | "completed"
   | "returned_to_customer"
   | "open"
@@ -39,9 +41,11 @@ const statusConfig: Record<StatusVariant, { label: string; variant: "default" | 
   in_transit: { label: "In Transit", variant: "default", className: "bg-blue-600 text-white" },
   received: { label: "Received", variant: "default", className: "bg-green-600 text-white" },
   under_inspection: { label: "Under Inspection", variant: "default", className: "bg-amber-500 text-white" },
+  reoffer_sent: { label: "Re-offer Sent", variant: "default", className: "bg-orange-500 text-white" },
   reoffer_pending: { label: "Re-offer Pending", variant: "default", className: "bg-orange-500 text-white" },
   customer_decision_pending: { label: "Decision Pending", variant: "default", className: "bg-purple-500 text-white" },
   payout_pending: { label: "Payout Pending", variant: "default", className: "bg-green-500 text-white" },
+  pending_payment: { label: "Payment Pending", variant: "secondary" },
   completed: { label: "Completed", variant: "default", className: "bg-green-700 text-white" },
   returned_to_customer: { label: "Returned", variant: "outline" },
 

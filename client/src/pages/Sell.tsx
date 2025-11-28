@@ -209,48 +209,63 @@ export default function Sell() {
     setPaymentMethod(method);
   };
 
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = async () => {
     if (paymentUsername !== paymentUsernameConfirm) {
       alert("Usernames do not match!");
       return;
     }
-    // Build order payload for backend schema
+
     const orderPayload = {
-      customer: {
+      customerInfo: {
         email: shippingEmail,
+        name: shippingEmail,
         phone,
-        companyName: null,
-        website: null,
       },
-      items: [
+      devices: [
         {
-          deviceModelId: selectedModel,
-          deviceVariantId: null,
+          modelId: selectedModel,
+          storage,
+          carrier,
+          condition: { hasCracks, isFullyFunctional, hasActivationLock, isBlacklisted },
+          price: calculatedOffer,
           quantity: 1,
-          unitPrice: calculatedOffer,
         },
       ],
+      shippingAddress: shippingOption === "kit" || shippingOption === "label"
+        ? {
+            street1: address,
+            city,
+            state,
+            postalCode: zipCode,
+            contactName: shippingEmail,
+            phone,
+          }
+        : undefined,
+      paymentMethod,
       notes: `Shipping: ${shippingOption}; payout: ${paymentMethod}; username: ${paymentUsername}`,
     };
-    fetch(getApiUrl("/api/submit-order"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(orderPayload),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.details || err.error || "Failed to submit order");
-        }
-        const result = await res.json();
-        setShowPaymentDialog(false);
-        // Redirect to success page
-        setLocation(`/success?order=${result.orderNumber}`);
-      })
-      .catch((err) => {
-        console.error("Order submission failed:", err);
-        alert("Order submission failed: " + err.message);
+
+    try {
+      const res = await fetch(getApiUrl("/api/orders"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(orderPayload),
       });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.details || err.error || "Failed to submit order");
+      }
+
+      const result = await res.json();
+      const number = result.orderNumber || result.order?.orderNumber || result.order?.id;
+      setShowPaymentDialog(false);
+      setLocation(`/success?order=${number}`);
+    } catch (err: any) {
+      console.error("Order submission failed:", err);
+      alert("Order submission failed: " + err.message);
+    }
   };
 
   const selectedBrandData = brands.find(b => b.id === selectedBrand);

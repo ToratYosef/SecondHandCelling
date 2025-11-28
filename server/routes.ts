@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import bcrypt from "bcrypt";
 import Stripe from "stripe";
 import { z } from "zod";
+import { sendEmail } from "./services/email";
 import {
   insertUserSchema,
   insertCompanySchema,
@@ -1181,7 +1182,7 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
           orderNumber,
           companyId: guestCompany.id,
           createdByUserId: guestUser.id,
-          status: 'pending_payment',
+          status: 'label_pending',
           subtotal: total.toFixed(2),
           shippingCost: '0',
           taxAmount: '0',
@@ -2129,7 +2130,28 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
   app.get("/api/admin/orders", requireAdmin, async (req, res) => {
     try {
       const orders = await storage.getAllOrders();
-      res.json(orders);
+
+      const enhancedOrders = await Promise.all(
+        orders.map(async (order) => {
+          const [user, company, shipments, items] = await Promise.all([
+            storage.getUser(order.createdByUserId),
+            storage.getCompany(order.companyId),
+            storage.getShipmentsByOrderId(order.id),
+            storage.getOrderItems(order.id),
+          ]);
+
+          return {
+            ...order,
+            customerEmail: user?.email,
+            customerName: user?.name,
+            companyName: company?.name,
+            shipments,
+            items,
+          };
+        })
+      );
+
+      res.json(enhancedOrders);
     } catch (error: any) {
       console.error("Get all orders error:", error);
       res.status(500).json({ error: "Failed to get orders" });
@@ -2394,9 +2416,10 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
   // Update order status (admin only)
   app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
     try {
-      const { status } = req.body;
+      const { status, paymentStatus } = req.body;
       const updates: any = {};
       if (status) updates.status = status;
+      if (paymentStatus) updates.paymentStatus = paymentStatus;
 
       const order = await storage.updateOrder(req.params.id, updates);
       
@@ -2417,6 +2440,67 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
     } catch (error: any) {
       console.error("Update order error:", error);
       res.status(500).json({ error: "Failed to update order" });
+    }
+  });
+
+  // Send a reoffer email to the customer (admin only)
+  app.post("/api/admin/orders/:id/reoffer", requireAdmin, async (req, res) => {
+    try {
+      const { amount, message, email } = req.body || {};
+
+      const parsedAmount = parseFloat(amount);
+      if (Number.isNaN(parsedAmount)) {
+        return res.status(400).json({ error: "A valid reoffer amount is required" });
+      }
+
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const user = await storage.getUser(order.createdByUserId);
+      const recipient = email || user?.email;
+      if (!recipient) {
+        return res.status(400).json({ error: "No recipient email found for this order" });
+      }
+
+      const formattedAmount = parsedAmount.toFixed(2);
+      const emailBody = `
+        <p>Hi ${user?.name || "there"},</p>
+        <p>We've completed the inspection for order <strong>${order.orderNumber}</strong>.</p>
+        <p>Your updated offer is <strong>$${formattedAmount}</strong>.</p>
+        ${message ? `<p>${message}</p>` : ""}
+        <p>Please reply to this email to accept or decline the updated offer.</p>
+        <p>Thank you,<br/>SecondHandCell Team</p>
+      `;
+
+      await sendEmail({
+        to: recipient,
+        subject: `Updated offer for order ${order.orderNumber}`,
+        html: emailBody,
+      });
+
+      const noteLine = `[${new Date().toISOString()}] Reoffer sent for $${formattedAmount}${
+        message ? ` - ${message}` : ""
+      }`;
+
+      const updatedOrder = await storage.updateOrder(req.params.id, {
+        status: "reoffer_sent",
+        notesInternal: [order.notesInternal || "", noteLine].filter(Boolean).join("\n"),
+      });
+
+      await storage.createAuditLog({
+        actorUserId: req.session.userId!,
+        action: "order_reoffer_sent",
+        entityType: "order",
+        entityId: req.params.id,
+        newValues: JSON.stringify({ amount: formattedAmount, message }),
+      });
+
+      res.json({ message: "Reoffer email sent", order: updatedOrder });
+    } catch (error: any) {
+      console.error("Failed to send reoffer email:", error);
+      res.status(500).json({ error: "Unable to send reoffer email" });
     }
   });
 
