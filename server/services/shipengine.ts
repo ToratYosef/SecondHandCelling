@@ -107,9 +107,10 @@ export class ShipEngineService {
   private testMode: boolean;
 
   constructor() {
-    // Use test key if available, otherwise production key
-    this.apiKey = process.env.SHIPENGINE_KEY_TEST || process.env.SHIPENGINE_KEY || '';
-    this.testMode = !!process.env.SHIPENGINE_KEY_TEST;
+    // Use production key only
+    this.apiKey = process.env.SHIPENGINE_KEY || '';
+    // Force production labels
+    this.testMode = false;
     
     if (!this.apiKey) {
       throw new Error('ShipEngine API key not configured');
