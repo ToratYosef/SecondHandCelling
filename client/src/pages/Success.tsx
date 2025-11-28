@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Download, Package } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getApiUrl } from "@/lib/api";
 
 export default function Success() {
@@ -23,18 +23,6 @@ export default function Success() {
       return res.json();
     },
     enabled: !!orderNumber,
-  });
-
-  // Fetch shipment details if available
-  const { data: shipment } = useQuery({
-    queryKey: ['/api/orders', order?.id, 'shipment'],
-    queryFn: async () => {
-      if (!order?.id) return null;
-      const res = await fetch(getApiUrl(`/api/orders/${order.id}/shipment`));
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!order?.id,
   });
 
   useEffect(() => {
@@ -73,10 +61,11 @@ export default function Success() {
   }
 
   const deviceName = order?.items?.[0]?.deviceModel?.name || 'Your device';
-  const storage = order?.items?.[0]?.deviceVariant?.storageGb 
-    ? `${order.items[0].deviceVariant.storageGb}GB` 
+  const storage = order?.items?.[0]?.deviceVariant?.storageGb
+    ? `${order.items[0].deviceVariant.storageGb}GB`
     : '';
-  const offerAmount = order?.totalOriginalOffer || 0;
+  const offerAmount = order?.totalOriginalOffer || order?.total || 0;
+  const shipment = useMemo(() => order?.shipments?.[0], [order]);
 
   // Debug logging
   console.log('[Success] Order:', order?.id);

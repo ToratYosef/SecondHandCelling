@@ -94,19 +94,33 @@ export function InstantQuoteWidget() {
       
       // Submit guest order via public endpoint
       const submitPayload = {
-        customer: { email, phone, companyName: null, website: null },
-        items: [ { deviceModelId: selectedModel, deviceVariantId: null, quantity: 1, unitPrice: calculatedPrice } ],
+        customerInfo: { email, name, phone },
+        devices: [
+          {
+            modelId: selectedModel,
+            storage,
+            carrier,
+            condition: { condition },
+            price: calculatedPrice,
+            quantity: 1,
+          },
+        ],
+        shippingAddress: address
+          ? { street1: address, city, state, postalCode: zipCode, contactName: name, phone }
+          : undefined,
+        paymentMethod,
         notes: `Address: ${address}, ${city}, ${state}, ${zipCode}; payout: ${paymentMethod}; username: ${paymentUsername}`,
       };
-      const submitRes = await fetch(getApiUrl("/api/submit-order"), {
+      const submitRes = await fetch(getApiUrl("/api/orders"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(submitPayload),
       });
       if (!submitRes.ok) throw new Error("Failed to submit order");
       const result = await submitRes.json();
       // Redirect to success page
-      setLocation(`/success?order=${result.orderNumber}`);
+      setLocation(`/success?order=${result.orderNumber || result.order?.orderNumber || result.order?.id}`);
     } catch (error) {
       console.error("Order submission failed:", error);
       alert("Failed to submit order. Please try again.");

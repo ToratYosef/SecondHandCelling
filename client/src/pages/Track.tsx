@@ -33,14 +33,33 @@ export default function Track() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "pending": return <Clock className="w-6 h-6 text-yellow-500" />;
-      case "shipped": return <Truck className="w-6 h-6 text-blue-500" />;
-      case "inspecting": return <Package className="w-6 h-6 text-purple-500" />;
-      case "approved": return <CheckCircle className="w-6 h-6 text-green-500" />;
-      case "paid": return <DollarSign className="w-6 h-6 text-green-600" />;
-      default: return <AlertCircle className="w-6 h-6 text-muted-foreground" />;
+      case "pending":
+      case "pending_payment":
+      case "label_pending":
+        return <Clock className="w-6 h-6 text-yellow-500" />;
+      case "awaiting_device":
+      case "in_transit":
+        return <Truck className="w-6 h-6 text-blue-500" />;
+      case "received":
+      case "under_inspection":
+        return <Package className="w-6 h-6 text-purple-500" />;
+      case "reoffer_sent":
+      case "payment_review":
+        return <AlertCircle className="w-6 h-6 text-amber-500" />;
+      case "approved":
+      case "payout_pending":
+      case "paid":
+        return <DollarSign className="w-6 h-6 text-green-600" />;
+      case "completed":
+        return <CheckCircle className="w-6 h-6 text-green-500" />;
+      case "cancelled":
+        return <AlertCircle className="w-6 h-6 text-muted-foreground" />;
+      default:
+        return <AlertCircle className="w-6 h-6 text-muted-foreground" />;
     }
   };
+
+  const friendlyStatus = (status: string) => status?.replace(/_/g, " ") || "";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -124,7 +143,7 @@ export default function Track() {
                         <span className="text-sm font-medium">Order Status</span>
                         {getStatusIcon(order.status)}
                       </div>
-                      <p className="text-lg font-bold capitalize">{order.status}</p>
+                      <p className="text-lg font-bold capitalize">{friendlyStatus(order.status)}</p>
                       <p className="text-xs text-muted-foreground mt-1">Order #{order.orderNumber}</p>
                     </div>
                     

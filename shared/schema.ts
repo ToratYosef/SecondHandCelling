@@ -19,7 +19,22 @@ export const companyUserRoleEnum = ["owner", "admin", "buyer"] as const;
 export const conditionGradeEnum = ["A", "B", "C", "D"] as const;
 export const networkLockStatusEnum = ["unlocked", "locked", "other"] as const;
 export const inventoryStatusEnum = ["in_stock", "reserved", "incoming", "discontinued"] as const;
-export const orderStatusEnum = ["pending_payment", "payment_review", "processing", "shipped", "completed", "cancelled"] as const;
+export const orderStatusEnum = [
+  "pending_payment",
+  "payment_review",
+  "processing",
+  "shipped",
+  "label_pending",
+  "awaiting_device",
+  "in_transit",
+  "received",
+  "under_inspection",
+  "reoffer_sent",
+  "payout_pending",
+  "completed",
+  "cancelled",
+  "returned_to_customer",
+] as const;
 export const paymentStatusEnum = ["unpaid", "paid", "partially_paid", "refunded"] as const;
 export const paymentMethodEnum = ["card", "wire", "ach", "terms", "other"] as const;
 export const quoteStatusEnum = ["draft", "sent", "accepted", "rejected", "expired"] as const;
