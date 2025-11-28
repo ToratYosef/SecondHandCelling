@@ -29,19 +29,8 @@ import AccountOrders from "@/pages/account/Orders";
 import AccountOrderDetail from "@/pages/account/OrderDetail";
 import AccountSettings from "@/pages/account/Settings";
 
-// Admin Pages
-import AdminDashboard from "@/pages/admin/Dashboard";
-import AdminDashboardNew from "@/pages/admin/DashboardNew";
-import AdminDevices from "@/pages/admin/Devices";
-import AdminOrders from "@/pages/admin/Orders";
-import AdminInspections from "@/pages/admin/Inspections";
-import AdminPricing from "@/pages/admin/Pricing";
-import AdminInspectionDetail from "@/pages/admin/InspectionDetail";
-import AdminAging from "@/pages/admin/Aging";
-import AdminAnalytics from "@/pages/admin/Analytics";
-import AdminPrintQueue from "@/pages/admin/PrintQueue";
-import AdminClicks from "@/pages/admin/Clicks";
-import AdminEmail from "@/pages/admin/Email";
+// Admin Pages (disabled view)
+import AdminDisabled from "@/pages/admin/Disabled";
 
 import NotFound from "@/pages/not-found";
 
@@ -76,18 +65,18 @@ function Router() {
       <Route path="/account/settings" component={AccountSettings} />
       
       {/* Admin Portal */}
-      <Route path="/admin/dashboard" component={AdminDashboardNew} />
-      <Route path="/admin/dashboard-old" component={AdminDashboard} />
-      <Route path="/admin/aging" component={AdminAging} />
-      <Route path="/admin/analytics" component={AdminAnalytics} />
-      <Route path="/admin/print-queue" component={AdminPrintQueue} />
-      <Route path="/admin/clicks" component={AdminClicks} />
-      <Route path="/admin/email" component={AdminEmail} />
-      <Route path="/admin/devices" component={AdminDevices} />
-      <Route path="/admin/orders" component={AdminOrders} />
-      <Route path="/admin/inspections" component={AdminInspections} />
-      <Route path="/admin/inspections/:orderNumber" component={AdminInspectionDetail} />
-      <Route path="/admin/pricing" component={AdminPricing} />
+      <Route path="/admin/dashboard" component={AdminDisabled} />
+      <Route path="/admin/dashboard-old" component={AdminDisabled} />
+      <Route path="/admin/aging" component={AdminDisabled} />
+      <Route path="/admin/analytics" component={AdminDisabled} />
+      <Route path="/admin/print-queue" component={AdminDisabled} />
+      <Route path="/admin/clicks" component={AdminDisabled} />
+      <Route path="/admin/email" component={AdminDisabled} />
+      <Route path="/admin/devices" component={AdminDisabled} />
+      <Route path="/admin/orders" component={AdminDisabled} />
+      <Route path="/admin/inspections" component={AdminDisabled} />
+      <Route path="/admin/inspections/:orderNumber" component={AdminDisabled} />
+      <Route path="/admin/pricing" component={AdminDisabled} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
