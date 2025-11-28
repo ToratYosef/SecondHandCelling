@@ -1058,8 +1058,8 @@ var DatabaseStorage = class {
 var storage = new DatabaseStorage();
 
 // server/routes.ts
-import bcrypt from "bcrypt";
-import { z } from "zod";
+import bcrypt2 from "bcrypt";
+import { z as z2 } from "zod";
 
 // server/services/email.ts
 import nodemailer from "nodemailer";
@@ -1990,6 +1990,8 @@ function createLabelsRouter() {
 
 // server/routes/orders.ts
 import { Router as Router4 } from "express";
+import bcrypt from "bcrypt";
+import { z } from "zod";
 function createOrdersRouter() {
   const router = Router4();
   router.post("/fetch-pdf", async (req, res) => {
@@ -2072,11 +2074,110 @@ function createOrdersRouter() {
   });
   router.post("/submit-order", async (req, res) => {
     try {
-      const orderData = req.body;
-      res.json({ orderId: "TBD", message: "Order submitted successfully" });
+      const OrderSchema = z.object({
+        customerInfo: z.object({
+          email: z.string().email(),
+          name: z.string().min(1),
+          phone: z.string().min(7).optional()
+        }),
+        devices: z.array(z.object({
+          modelId: z.string(),
+          storage: z.string().optional(),
+          carrier: z.string().optional(),
+          condition: z.record(z.string()).optional(),
+          price: z.number(),
+          quantity: z.number().int().positive().default(1)
+        })).min(1),
+        shippingAddress: z.object({
+          street1: z.string(),
+          city: z.string(),
+          state: z.string(),
+          postalCode: z.string(),
+          contactName: z.string(),
+          phone: z.string().optional()
+        }).optional(),
+        paymentMethod: z.string().optional(),
+        notes: z.string().optional()
+      });
+      const parsed = OrderSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid order payload", details: parsed.error.message });
+      }
+      const { customerInfo, devices, shippingAddress, paymentMethod, notes } = parsed.data;
+      let guestUser = await storage.getUserByEmail(customerInfo.email);
+      if (!guestUser) {
+        const randomPassword = Math.random().toString(36).slice(-8);
+        const passwordHash = await bcrypt.hash(randomPassword, 10);
+        guestUser = await storage.createUser({
+          email: customerInfo.email,
+          name: customerInfo.name || customerInfo.email.split("@")[0],
+          passwordHash,
+          role: "customer",
+          isActive: true
+        });
+      }
+      let guestCompany = await storage.getCompanyByName("Guest Orders");
+      if (!guestCompany) {
+        guestCompany = await storage.createCompany({
+          name: "Guest Orders",
+          legalName: "Guest Orders",
+          slug: "guest-orders",
+          status: "pending_review",
+          type: "supplier",
+          isActive: true
+        });
+      }
+      const subtotal = devices.reduce((sum, d) => sum + d.price * (d.quantity ?? 1), 0);
+      const shippingCost = 0;
+      const taxAmount = 0;
+      const discountAmount = 0;
+      const total = subtotal + shippingCost + taxAmount - discountAmount;
+      const orderNumber = `SL-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+      const order = await storage.createOrder({
+        orderNumber,
+        companyId: guestCompany.id,
+        createdByUserId: guestUser.id,
+        status: "label_pending",
+        subtotal: subtotal.toFixed(2),
+        shippingCost: shippingCost.toFixed(2),
+        taxAmount: taxAmount.toFixed(2),
+        discountAmount: discountAmount.toFixed(2),
+        total: total.toFixed(2),
+        currency: "USD",
+        notesInternal: notes
+      });
+      for (const d of devices) {
+        const deviceVariantId = d.modelId;
+        await storage.createOrderItem({
+          orderId: order.id,
+          deviceVariantId,
+          quantity: d.quantity ?? 1,
+          unitPrice: d.price,
+          lineTotal: d.price * (d.quantity ?? 1)
+        });
+        console.log("Created order item payload:", {
+          orderId: order.id,
+          deviceVariantId,
+          quantity: d.quantity ?? 1,
+          unitPrice: d.price,
+          lineTotal: d.price * (d.quantity ?? 1)
+        });
+      }
+      if (shippingAddress) {
+        await storage.createShippingAddress({
+          companyId: guestCompany.id,
+          name: shippingAddress.contactName,
+          street1: shippingAddress.street1,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          postalCode: shippingAddress.postalCode,
+          phone: shippingAddress.phone
+        });
+      }
+      return res.json({ orderNumber, order });
     } catch (error) {
       console.error("Error submitting order:", error);
-      res.status(500).json({ error: "Failed to submit order" });
+      res.status(500).json({ error: "Failed to submit order", details: error.message });
     }
   });
   router.get("/promo-codes/:code", async (req, res) => {
@@ -2361,33 +2462,33 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/auth/register", async (req, res) => {
     try {
-      const registerSchema = z.object({
+      const registerSchema = z2.object({
         // User data
-        name: z.string(),
-        email: z.string().email(),
-        phone: z.string(),
-        password: z.string().min(6),
+        name: z2.string(),
+        email: z2.string().email(),
+        phone: z2.string(),
+        password: z2.string().min(6),
         // Company data
-        companyName: z.string(),
-        legalName: z.string(),
-        website: z.string().optional(),
-        taxId: z.string().optional(),
-        businessType: z.string(),
+        companyName: z2.string(),
+        legalName: z2.string(),
+        website: z2.string().optional(),
+        taxId: z2.string().optional(),
+        businessType: z2.string(),
         // Address data
-        contactName: z.string(),
-        addressPhone: z.string(),
-        street1: z.string(),
-        street2: z.string().optional(),
-        city: z.string(),
-        state: z.string(),
-        postalCode: z.string()
+        contactName: z2.string(),
+        addressPhone: z2.string(),
+        street1: z2.string(),
+        street2: z2.string().optional(),
+        city: z2.string(),
+        state: z2.string(),
+        postalCode: z2.string()
       });
       const data = registerSchema.parse(req.body);
       const existingUser = await storage.getUserByEmail(data.email);
       if (existingUser) {
         return res.status(400).json({ error: "Email already registered" });
       }
-      const passwordHash = await bcrypt.hash(data.password, 10);
+      const passwordHash = await bcrypt2.hash(data.password, 10);
       const user = await storage.createUser({
         name: data.name,
         email: data.email,
@@ -2438,7 +2539,7 @@ async function registerRoutes(app2) {
         console.log("[Login] User not found:", email);
         return res.status(401).json({ error: "Invalid credentials" });
       }
-      const validPassword = await bcrypt.compare(password, user.passwordHash);
+      const validPassword = await bcrypt2.compare(password, user.passwordHash);
       if (!validPassword) {
         console.log("[Login] Invalid password for user:", email);
         return res.status(401).json({ error: "Invalid credentials" });
@@ -2524,7 +2625,7 @@ async function registerRoutes(app2) {
       if (!user.resetTokenExpiry || /* @__PURE__ */ new Date() > new Date(user.resetTokenExpiry)) {
         return res.status(400).json({ error: "Reset token has expired" });
       }
-      const passwordHash = await bcrypt.hash(newPassword, 10);
+      const passwordHash = await bcrypt2.hash(newPassword, 10);
       await storage.updateUser(user.id, {
         passwordHash,
         resetToken: null,
@@ -2645,9 +2746,9 @@ async function registerRoutes(app2) {
   });
   app2.patch("/api/profile", requireAuth, async (req, res) => {
     try {
-      const updateSchema = z.object({
-        name: z.string().min(1).optional(),
-        phone: z.string().nullable().optional()
+      const updateSchema = z2.object({
+        name: z2.string().min(1).optional(),
+        phone: z2.string().nullable().optional()
       });
       const updates = updateSchema.parse(req.body);
       const updatedUser = await storage.updateUser(req.session.userId, updates);
@@ -2666,20 +2767,20 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/profile/password", requireAuth, async (req, res) => {
     try {
-      const passwordSchema = z.object({
-        currentPassword: z.string().min(1),
-        newPassword: z.string().min(8)
+      const passwordSchema = z2.object({
+        currentPassword: z2.string().min(1),
+        newPassword: z2.string().min(8)
       });
       const { currentPassword, newPassword } = passwordSchema.parse(req.body);
       const user = await storage.getUser(req.session.userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+      const isValidPassword = await bcrypt2.compare(currentPassword, user.passwordHash);
       if (!isValidPassword) {
         return res.status(401).json({ error: "Current password is incorrect" });
       }
-      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      const newPasswordHash = await bcrypt2.hash(newPassword, 10);
       await storage.updateUser(user.id, { passwordHash: newPasswordHash });
       res.json({ success: true, message: "Password updated successfully" });
     } catch (error) {
@@ -3034,7 +3135,7 @@ async function registerRoutes(app2) {
         let guestUser = await storage.getUserByEmail(customerInfo.email);
         if (!guestUser) {
           const randomPassword = Math.random().toString(36).slice(-8);
-          const passwordHash = await bcrypt.hash(randomPassword, 10);
+          const passwordHash = await bcrypt2.hash(randomPassword, 10);
           guestUser = await storage.createUser({
             email: customerInfo.email,
             name: customerInfo.name || customerInfo.email.split("@")[0],
@@ -3296,24 +3397,24 @@ Notes: ${notes2}` : ""}`;
   });
   app2.post("/api/admin/device-models", requireAdmin, async (req, res) => {
     try {
-      const schema = z.object({
-        brand: z.string(),
-        name: z.string(),
-        marketingName: z.string().optional(),
-        sku: z.string(),
-        categorySlug: z.string().optional(),
-        categoryName: z.string().optional(),
-        description: z.string().optional(),
-        imageUrl: z.string().optional(),
-        variant: z.object({
-          storage: z.string(),
-          color: z.string(),
-          conditionGrade: z.string(),
-          networkLockStatus: z.string().default("unlocked"),
-          internalCode: z.string().optional(),
-          unitPrice: z.number(),
-          quantity: z.number().min(0),
-          minOrderQuantity: z.number().min(1).default(1)
+      const schema = z2.object({
+        brand: z2.string(),
+        name: z2.string(),
+        marketingName: z2.string().optional(),
+        sku: z2.string(),
+        categorySlug: z2.string().optional(),
+        categoryName: z2.string().optional(),
+        description: z2.string().optional(),
+        imageUrl: z2.string().optional(),
+        variant: z2.object({
+          storage: z2.string(),
+          color: z2.string(),
+          conditionGrade: z2.string(),
+          networkLockStatus: z2.string().default("unlocked"),
+          internalCode: z2.string().optional(),
+          unitPrice: z2.number(),
+          quantity: z2.number().min(0),
+          minOrderQuantity: z2.number().min(1).default(1)
         })
       });
       const data = schema.parse(req.body);
@@ -3379,14 +3480,14 @@ Notes: ${notes2}` : ""}`;
   });
   app2.patch("/api/admin/device-variants/:id", requireAdmin, async (req, res) => {
     try {
-      const schema = z.object({
-        storage: z.string().optional(),
-        color: z.string().optional(),
-        conditionGrade: z.string().optional(),
-        networkLockStatus: z.string().optional(),
-        unitPrice: z.number().optional(),
-        quantity: z.number().optional(),
-        minOrderQuantity: z.number().optional()
+      const schema = z2.object({
+        storage: z2.string().optional(),
+        color: z2.string().optional(),
+        conditionGrade: z2.string().optional(),
+        networkLockStatus: z2.string().optional(),
+        unitPrice: z2.number().optional(),
+        quantity: z2.number().optional(),
+        minOrderQuantity: z2.number().optional()
       });
       const data = schema.parse(req.body);
       const variantId = req.params.id;
@@ -3452,23 +3553,23 @@ Notes: ${notes2}` : ""}`;
   });
   app2.post("/api/admin/device-import", requireAdmin, async (req, res) => {
     try {
-      const schema = z.object({
-        devices: z.array(
-          z.object({
-            brand: z.string(),
-            name: z.string(),
-            marketingName: z.string().optional(),
-            sku: z.string(),
-            categorySlug: z.string().optional(),
-            categoryName: z.string().optional(),
-            variants: z.array(
-              z.object({
-                storage: z.string(),
-                color: z.string(),
-                conditionGrade: z.string(),
-                networkLockStatus: z.string().default("unlocked"),
-                unitPrice: z.number(),
-                quantity: z.number().min(0)
+      const schema = z2.object({
+        devices: z2.array(
+          z2.object({
+            brand: z2.string(),
+            name: z2.string(),
+            marketingName: z2.string().optional(),
+            sku: z2.string(),
+            categorySlug: z2.string().optional(),
+            categoryName: z2.string().optional(),
+            variants: z2.array(
+              z2.object({
+                storage: z2.string(),
+                color: z2.string(),
+                conditionGrade: z2.string(),
+                networkLockStatus: z2.string().default("unlocked"),
+                unitPrice: z2.number(),
+                quantity: z2.number().min(0)
               })
             )
           })

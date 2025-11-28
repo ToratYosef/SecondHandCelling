@@ -1,4 +1,8 @@
 import { Router, type Request, type Response } from 'express';
+import bcrypt from 'bcrypt';
+import { z } from 'zod';
+import { storage } from '../storage';
+import * as schema from '@shared/schema';
 
 export function createOrdersRouter() {
   const router = Router();
@@ -114,23 +118,131 @@ export function createOrdersRouter() {
     }
   });
 
-  // Submit new order
+  // Submit new order (public guest flow)
   router.post('/submit-order', async (req: Request, res: Response) => {
     try {
-      const orderData = req.body;
-      
-      // TODO: Implement order submission logic
-      // - Validate order data
-      // - Apply promo code if provided
-      // - Generate order number
-      // - Create order in database
-      // - Generate label if needed
-      // - Send confirmation emails
-      
-      res.json({ orderId: 'TBD', message: 'Order submitted successfully' });
-    } catch (error) {
+      const OrderSchema = z.object({
+        customerInfo: z.object({
+          email: z.string().email(),
+          name: z.string().min(1),
+          phone: z.string().min(7).optional(),
+        }),
+        devices: z.array(z.object({
+          modelId: z.string(),
+          storage: z.string().optional(),
+          carrier: z.string().optional(),
+          condition: z.record(z.string()).optional(),
+          price: z.number(),
+          quantity: z.number().int().positive().default(1),
+        })).min(1),
+        shippingAddress: z.object({
+          street1: z.string(),
+          city: z.string(),
+          state: z.string(),
+          postalCode: z.string(),
+          contactName: z.string(),
+          phone: z.string().optional(),
+        }).optional(),
+        paymentMethod: z.string().optional(),
+        notes: z.string().optional(),
+      });
+
+      const parsed = OrderSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid order payload', details: parsed.error.message });
+      }
+
+      const { customerInfo, devices, shippingAddress, paymentMethod, notes } = parsed.data;
+
+      // Ensure guest user exists
+      let guestUser = await storage.getUserByEmail(customerInfo.email);
+      if (!guestUser) {
+        const randomPassword = Math.random().toString(36).slice(-8);
+        const passwordHash = await bcrypt.hash(randomPassword, 10);
+        guestUser = await storage.createUser({
+          email: customerInfo.email,
+          name: customerInfo.name || customerInfo.email.split('@')[0],
+          passwordHash,
+          role: 'customer',
+          isActive: true,
+        });
+      }
+
+      // Ensure guest company exists
+      let guestCompany = await storage.getCompanyByName('Guest Orders');
+      if (!guestCompany) {
+        guestCompany = await storage.createCompany({
+          name: 'Guest Orders',
+          legalName: 'Guest Orders',
+          slug: 'guest-orders',
+          status: 'pending_review',
+          type: 'supplier',
+          isActive: true,
+        } as any);
+      }
+
+      // Calculate totals
+      const subtotal = devices.reduce((sum, d) => sum + d.price * (d.quantity ?? 1), 0);
+      const shippingCost = 0;
+      const taxAmount = 0;
+      const discountAmount = 0;
+      const total = subtotal + shippingCost + taxAmount - discountAmount;
+
+      // Generate order number
+      const orderNumber = `SL-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+
+      // Create order
+      const order = await storage.createOrder({
+        orderNumber,
+        companyId: guestCompany.id,
+        createdByUserId: guestUser.id,
+        status: 'label_pending',
+        subtotal: subtotal.toFixed(2),
+        shippingCost: shippingCost.toFixed(2),
+        taxAmount: taxAmount.toFixed(2),
+        discountAmount: discountAmount.toFixed(2),
+        total: total.toFixed(2),
+        currency: 'USD',
+        notesInternal: notes,
+      } as any);
+
+      // Create order items
+      for (const d of devices) {
+        // Map modelId to deviceVariantId if needed
+        const deviceVariantId = d.modelId; // assuming modelId is variant id in this data
+        await storage.createOrderItem({
+          orderId: order.id,
+          deviceVariantId,
+          quantity: d.quantity ?? 1,
+          unitPrice: d.price,
+          lineTotal: d.price * (d.quantity ?? 1),
+        } as any);
+        console.log('Created order item payload:', {
+          orderId: order.id,
+          deviceVariantId,
+          quantity: d.quantity ?? 1,
+          unitPrice: d.price,
+          lineTotal: d.price * (d.quantity ?? 1),
+        });
+      }
+
+      // Optional shipping address
+      if (shippingAddress) {
+        await storage.createShippingAddress({
+          companyId: guestCompany.id,
+          name: shippingAddress.contactName,
+          street1: shippingAddress.street1,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          postalCode: shippingAddress.postalCode,
+          phone: shippingAddress.phone,
+        } as any);
+      }
+
+      return res.json({ orderNumber, order });
+    } catch (error: any) {
       console.error('Error submitting order:', error);
-      res.status(500).json({ error: 'Failed to submit order' });
+      res.status(500).json({ error: 'Failed to submit order', details: error.message });
     }
   });
 
