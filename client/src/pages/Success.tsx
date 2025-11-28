@@ -11,6 +11,13 @@ import { getApiUrl } from "@/lib/api";
 export default function Success() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
+  
+  // Always call all hooks first, before any conditional logic
+  useEffect(() => {
+    // Scroll to top on mount
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const searchParams = new URLSearchParams(searchString || "");
   const orderNumber = searchParams.get('order');
 
@@ -27,11 +34,7 @@ export default function Success() {
     retry: false,
   });
 
-  useEffect(() => {
-    // Scroll to top on mount
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
+  // Now handle conditional rendering after all hooks
   if (!orderNumber) {
     return (
       <div className="min-h-screen flex flex-col">
