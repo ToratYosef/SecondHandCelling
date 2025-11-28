@@ -13,7 +13,10 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 
 // server/db.ts
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
@@ -511,7 +514,6 @@ var savedListItemsRelations = relations(savedListItems, ({ one }) => ({
 var payments = pgTable("payments", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-  stripePaymentIntentId: text("stripe_payment_intent_id"),
   amount: real("amount").notNull(),
   currency: text("currency").notNull().default("USD"),
   status: text("status").notNull(),
@@ -707,6 +709,22 @@ var insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 });
 
 // server/db.ts
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = dirname(__filename);
+var envPaths = [
+  resolve(__dirname, "../.env"),
+  // When running from server/ (unbundled)
+  resolve(__dirname, "../../.env"),
+  // When running from server/dist/ (bundled)
+  resolve(process.cwd(), ".env")
+  // Fallback to cwd
+];
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    config({ path: envPath });
+    break;
+  }
+}
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
@@ -3086,9 +3104,6 @@ Notes: ${notes2}` : ""}`;
       if (!billingAddressId) {
         return res.status(400).json({ error: "Billing address is required" });
       }
-      if (paymentMethod === "card" && !stripe) {
-        return res.status(503).json({ error: "Card payment is not available. Please select another payment method." });
-      }
       const cart = await storage.getCartByUserId(userId);
       if (!cart) {
         return res.status(400).json({ error: "Cart not found" });
@@ -3187,91 +3202,6 @@ Notes: ${notes2}` : ""}`;
     } catch (error) {
       console.error("Get order error:", error);
       res.status(500).json({ error: "Failed to get order" });
-    }
-  });
-  app2.post("/api/create-payment-intent", requireAuth, async (req, res) => {
-    try {
-      if (!stripe) {
-        return res.status(503).json({ error: "Payment processing is not configured" });
-      }
-      const { amount, orderId } = req.body;
-      if (!orderId) {
-        return res.status(400).json({ error: "Order ID is required" });
-      }
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
-      const hasAccess = companyUsers2.some((cu) => cu.companyId === order.companyId);
-      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
-        return res.status(403).json({ error: "Access denied" });
-      }
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(parseFloat(amount) * 100),
-        // Convert to cents
-        currency: "usd",
-        metadata: {
-          orderId,
-          userId: req.session.userId,
-          orderNumber: order.orderNumber
-        }
-      });
-      await storage.updateOrder(orderId, {
-        notesInternal: `Stripe Payment Intent: ${paymentIntent.id}`
-      });
-      res.json({ clientSecret: paymentIntent.client_secret });
-    } catch (error) {
-      console.error("Create payment intent error:", error);
-      res.status(500).json({ error: "Failed to create payment intent: " + error.message });
-    }
-  });
-  app2.post("/api/confirm-payment", requireAuth, async (req, res) => {
-    try {
-      const { orderId, paymentIntentId } = req.body;
-      if (!orderId || !paymentIntentId) {
-        return res.status(400).json({ error: "Order ID and payment intent ID are required" });
-      }
-      if (!stripe) {
-        return res.status(503).json({ error: "Payment processing is not configured" });
-      }
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const companyUsers2 = await storage.getCompanyUsersByUserId(req.session.userId);
-      const hasAccess = companyUsers2.some((cu) => cu.companyId === order.companyId);
-      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
-        return res.status(403).json({ error: "Access denied" });
-      }
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      if (paymentIntent.metadata.orderId !== orderId) {
-        return res.status(400).json({ error: "Payment intent does not match order" });
-      }
-      if (paymentIntent.status !== "succeeded") {
-        return res.status(400).json({ error: "Payment has not succeeded" });
-      }
-      const orderTotalCents = Math.round(parseFloat(order.total) * 100);
-      if (paymentIntent.amount !== orderTotalCents) {
-        return res.status(400).json({ error: "Payment amount does not match order total" });
-      }
-      await storage.updateOrder(orderId, {
-        status: "processing",
-        paymentStatus: "paid"
-      });
-      await storage.createPayment({
-        orderId,
-        amount: (paymentIntent.amount / 100).toFixed(2),
-        currency: paymentIntent.currency.toUpperCase(),
-        method: "card",
-        status: "paid",
-        stripePaymentIntentId: paymentIntent.id,
-        processedAt: /* @__PURE__ */ new Date()
-      });
-      res.json({ success: true, order });
-    } catch (error) {
-      console.error("Confirm payment error:", error);
-      res.status(500).json({ error: "Failed to confirm payment: " + error.message });
     }
   });
   app2.get("/api/companies/:id", requireAuth, async (req, res) => {
@@ -4395,7 +4325,7 @@ var vite_config_default = defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "https://api.secondhandcell.com",
+        target: process.env.VITE_API_URL || "https://secondhandcelling.onrender.com",
         changeOrigin: true,
         secure: true
       }

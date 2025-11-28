@@ -13,7 +13,10 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 
 // db.ts
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
@@ -706,6 +709,22 @@ var insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 });
 
 // db.ts
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = dirname(__filename);
+var envPaths = [
+  resolve(__dirname, "../.env"),
+  // When running from server/ (unbundled)
+  resolve(__dirname, "../../.env"),
+  // When running from server/dist/ (bundled)
+  resolve(process.cwd(), ".env")
+  // Fallback to cwd
+];
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    config({ path: envPath });
+    break;
+  }
+}
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
@@ -4306,7 +4325,7 @@ var vite_config_default = defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "https://api.secondhandcell.com",
+        target: process.env.VITE_API_URL || "https://secondhandcelling.onrender.com",
         changeOrigin: true,
         secure: true
       }
