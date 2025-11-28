@@ -1414,123 +1414,15 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
     }
   });
 
-  // ==================== COMPANY ROUTES ====================
-  
-  // Get company by ID (buyer can only access their own)
-  app.get("/api/companies/:id", requireAuth, async (req, res) => {
-    try {
-      const company = await storage.getCompany(req.params.id);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
-      }
-
-      // Check if user is admin or member of this company
-      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
-        const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
-        const isMember = companyUsers.some((cu) => cu.companyId === req.params.id);
-        if (!isMember) {
-          return res.status(403).json({ error: "Access denied" });
-        }
-      }
-
-      // Get addresses
-      const shippingAddresses = await storage.getShippingAddressesByCompanyId(company.id);
-      const billingAddresses = await storage.getBillingAddressesByCompanyId(company.id);
-
-      res.json({
-        ...company,
-        shippingAddresses,
-        billingAddresses,
-      });
-    } catch (error: any) {
-      console.error("Get company error:", error);
-      res.status(500).json({ error: "Failed to get company" });
-    }
-  });
+  // (Company routes removed)
   
   // ==================== ADMIN ROUTES ====================
   
-  // Get all companies (admin only)
-  app.get("/api/admin/companies", async (req, res) => {
-    try {
-      const companies = await storage.getAllCompanies();
-      res.json(companies);
-    } catch (error: any) {
-      console.error("Get companies error:", error);
-      res.status(500).json({ error: "Failed to get companies" });
-    }
-  });
+  // (Admin company listing removed)
 
-  // Bulk update companies (atomic) - e.g. approve many companies at once
-  app.post("/api/admin/companies/bulk", async (req, res) => {
-    try {
-      const { companyIds, status, creditLimit } = req.body;
+  // (Admin company bulk update removed)
 
-      if (!Array.isArray(companyIds) || companyIds.length === 0) {
-        return res.status(400).json({ error: "companyIds must be a non-empty array" });
-      }
-
-      // Perform atomic transaction using drizzle `db.transaction`
-      const results = await db.transaction(async (tx) => {
-        const updated: any[] = [];
-
-        for (const id of companyIds) {
-          const updates: any = {};
-          if (status) updates.status = status;
-          if (creditLimit !== undefined) updates.creditLimit = creditLimit;
-
-          // Use direct update against tx for atomicity
-          const [company] = await tx.update(schema.companies).set(updates).where(schema.companies.id.equals(id)).returning();
-          if (company) {
-            await tx.insert(schema.auditLogs).values({
-              actorUserId: req.session.userId || null,
-              companyId: id,
-              action: "company_bulk_updated",
-              entityType: "company",
-              entityId: id,
-              previousValues: null,
-              newValues: JSON.stringify(updates),
-            });
-            updated.push(company);
-          }
-        }
-
-        return updated;
-      });
-
-      res.json({ updated: results });
-    } catch (error: any) {
-      console.error("Bulk update companies error:", error);
-      res.status(500).json({ error: "Failed to bulk update companies" });
-    }
-  });
-
-  // Update company status (admin only)
-  app.patch("/api/admin/companies/:id", async (req, res) => {
-    try {
-      const { status, creditLimit } = req.body;
-      const updates: any = {};
-      if (status) updates.status = status;
-      if (creditLimit !== undefined) updates.creditLimit = creditLimit;
-
-      const company = await storage.updateCompany(req.params.id, updates);
-      
-      // Log the action
-      await storage.createAuditLog({
-        actorUserId: req.session.userId!,
-        companyId: req.params.id,
-        action: "company_updated",
-        entityType: "company",
-        entityId: req.params.id,
-        newValues: JSON.stringify(updates),
-      });
-
-      res.json(company);
-    } catch (error: any) {
-      console.error("Update company error:", error);
-      res.status(500).json({ error: "Failed to update company" });
-    }
-  });
+  // (Admin company update removed)
 
   // Add a single device (model + variant + inventory) (admin only)
   app.post("/api/admin/device-models", async (req, res) => {
@@ -1916,25 +1808,7 @@ ${notes ? `\nNotes: ${notes}` : ''}`;
     }
   });
   
-  // Get quotes for a company
-  app.get("/api/companies/:companyId/quotes", requireAuth, async (req, res) => {
-    try {
-      // Check authorization
-      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
-        const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
-        const isMember = companyUsers.some((cu) => cu.companyId === req.params.companyId);
-        if (!isMember) {
-          return res.status(403).json({ error: "Access denied" });
-        }
-      }
-      
-      const quotes = await storage.getQuotesByCompanyId(req.params.companyId);
-      res.json(quotes);
-    } catch (error: any) {
-      console.error("Get company quotes error:", error);
-      res.status(500).json({ error: "Failed to get company quotes" });
-    }
-  });
+  // (Company quotes route removed)
   
   // Update quote (admin only for pricing, buyers can update notes)
   app.patch("/api/quotes/:id", requireAuth, async (req, res) => {
