@@ -1,7 +1,7 @@
 import React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useEffect, useRef } from "react";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 
 type AuthPromptProps = {
   onClose: () => void;

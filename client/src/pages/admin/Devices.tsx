@@ -237,6 +237,7 @@ export default function AdminDevices() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add New Device</DialogTitle>
+                    <DialogDescription>Fill in details to create a device model.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
@@ -295,6 +296,7 @@ export default function AdminDevices() {
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>Import Devices from XML</DialogTitle>
+                    <DialogDescription>Paste XML content or upload a file to import.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
@@ -388,6 +390,7 @@ export default function AdminDevices() {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Edit Device</DialogTitle>
+                        <DialogDescription>Update the device’s fields and save changes.</DialogDescription>
                       </DialogHeader>
                       {editDevice && (
                         <div className="space-y-4">
@@ -419,6 +422,7 @@ export default function AdminDevices() {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Delete Device</DialogTitle>
+                        <DialogDescription>This will permanently remove the device and its variants.</DialogDescription>
                       </DialogHeader>
                       {deleteDevice && (
                         <div className="space-y-4">
