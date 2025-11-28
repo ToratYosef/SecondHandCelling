@@ -1,3 +1,21 @@
+    async getShippingAddress(id: string): Promise<ShippingAddress | undefined> {
+      if (!id) return undefined;
+      const [address] = await db.select().from(schema.shippingAddresses).where(eq(schema.shippingAddresses.id, id));
+      return address || undefined;
+    }
+  async getNextOrderNumber(): Promise<string> {
+    // Get the highest order number
+    const result = await db.select({ orderNumber: schema.orders.orderNumber })
+      .from(schema.orders)
+      .orderBy(desc(schema.orders.createdAt))
+      .limit(1);
+    let nextNum = 1;
+    if (result.length && result[0].orderNumber?.startsWith('SHC-')) {
+      const num = parseInt(result[0].orderNumber.replace('SHC-', ''), 10);
+      if (!isNaN(num)) nextNum = num + 1;
+    }
+    return `SHC-${nextNum}`;
+  }
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { 

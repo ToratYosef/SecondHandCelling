@@ -1,3 +1,41 @@
+import { buildEmailLayout } from '../helpers/emailTemplates';
+
+export async function sendOrderConfirmationEmail({ to, order, orderNumber, labelPdf, shippingAddress }: {
+  to: string;
+  order: any;
+  orderNumber: string;
+  labelPdf: Buffer;
+  shippingAddress: any;
+}) {
+  const html = buildEmailLayout({
+    title: `Order Confirmation: ${orderNumber}`,
+    bodyHtml: `
+      <p>Thank you for your order!</p>
+      <p><strong>Order Number:</strong> ${orderNumber}</p>
+      <p><strong>Shipping Address:</strong><br>
+        ${shippingAddress?.contactName || ''}<br>
+        ${shippingAddress?.street1 || ''} ${shippingAddress?.street2 || ''}<br>
+        ${shippingAddress?.city || ''}, ${shippingAddress?.state || ''} ${shippingAddress?.postalCode || ''}<br>
+        USA
+      </p>
+      <p>Your shipping label is attached as a PDF. Please print and attach it to your package.</p>
+    `,
+    accentColor: '#16a34a',
+    includeTrustpilot: true,
+  });
+  await sendEmail({
+    to,
+    subject: `Your SecondHandCell Order ${orderNumber}`,
+    html,
+    attachments: [
+      {
+        filename: `ShippingLabel-${orderNumber}.pdf`,
+        content: labelPdf,
+        contentType: 'application/pdf',
+      },
+    ],
+  });
+}
 import nodemailer from 'nodemailer';
 
 // Email transporter singleton

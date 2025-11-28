@@ -1,3 +1,14 @@
+  // Progress bar steps
+  const steps = [
+    { key: 'brand', label: 'Brand' },
+    { key: 'model', label: 'Model' },
+    { key: 'questions', label: 'Questions' },
+    { key: 'quote', label: 'Quote' },
+    { key: 'shipping', label: 'Shipping' },
+    { key: 'payment', label: 'Payment' },
+    { key: 'confirmed', label: 'Confirmed' },
+  ];
+  const currentStepIndex = steps.findIndex(s => s.key === step);
 import { PublicHeader } from "@/components/PublicHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { Card } from "@/components/ui/card";
@@ -169,12 +180,41 @@ export default function Sell() {
     if (hasActivationLock === "yes") {
       setRejectionReason("FMI/Activation Lock");
       setShowRejectionDialog(true);
-      return;
-    }
-    if (isBlacklisted === "yes") {
-      setRejectionReason("Blacklisted");
-      setShowRejectionDialog(true);
-      return;
+      return (
+        <>
+          <PublicHeader />
+          {/* Progress Bar */}
+          <div className="w-full px-4 pt-4">
+            <div className="flex items-center gap-2 mb-6">
+              {steps.map((s, idx) => (
+                <div key={s.key} className="flex-1 flex flex-col items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${idx <= currentStepIndex ? 'bg-primary' : 'bg-muted'}`}
+                  >
+                    {idx + 1}
+                  </div>
+                  <span className={`text-xs mt-1 ${idx === currentStepIndex ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>{s.label}</span>
+                </div>
+                )).reduce((prev, curr, idx) => [
+                  prev,
+                  idx < steps.length - 1 ? <div key={`bar-${idx}`} className={`h-1 w-8 ${idx < currentStepIndex ? 'bg-primary' : 'bg-muted'} rounded-full mx-1`} /> : null,
+                  curr
+                ])}
+            </div>
+          </div>
+
+          {/* ...existing code... */}
+
+          {/* Previous Button */}
+          {currentStepIndex > 0 && (
+            <div className="w-full flex justify-start px-4 pb-4">
+              <Button variant="outline" onClick={() => setStep(steps[currentStepIndex - 1].key as any)}>
+                Previous
+              </Button>
+            </div>
+          )}
+        </>
+      );
     }
 
     // Simple pricing logic (in real app, this would call backend)

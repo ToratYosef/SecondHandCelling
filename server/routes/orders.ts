@@ -1,3 +1,34 @@
+  // Endpoint to download label PDF for an order
+  router.get('/label/:orderNumber', async (req: Request, res: Response) => {
+    try {
+      const { orderNumber } = req.params;
+      // For demo, regenerate label (in production, store label after creation)
+      const order = await storage.getOrderByNumber(orderNumber);
+      if (!order) return res.status(404).send('Order not found');
+      // Fetch shipping address
+      const shippingAddress = await storage.getShippingAddress(order.shippingAddressId);
+      const PDFDocument = require('pdfkit');
+      const doc = new PDFDocument();
+      let pdfChunks: Buffer[] = [];
+      doc.text(`Shipping Label for Order ${orderNumber}`);
+      doc.text(`Name: ${shippingAddress?.contactName || ''}`);
+      doc.text(`Address: ${shippingAddress?.street1 || ''} ${shippingAddress?.street2 || ''}`);
+      doc.text(`City: ${shippingAddress?.city || ''}`);
+      doc.text(`State: ${shippingAddress?.state || ''}`);
+      doc.text(`Postal Code: ${shippingAddress?.postalCode || ''}`);
+      doc.text(`Country: USA`);
+      doc.end();
+      doc.on('data', (chunk: Buffer) => pdfChunks.push(chunk));
+      await new Promise(resolve => doc.on('end', resolve));
+      const pdfBuffer = Buffer.concat(pdfChunks);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=ShippingLabel-${orderNumber}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error generating label PDF:', error);
+      res.status(500).send('Failed to generate label PDF');
+    }
+  });
 import { Router, type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
@@ -188,8 +219,8 @@ export function createOrdersRouter() {
       const discountAmount = 0;
       const total = subtotal + shippingCost + taxAmount - discountAmount;
 
-      // Generate order number
-      const orderNumber = `SL-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+      // Generate order number (incremental SHC-<number>)
+      const orderNumber = await storage.getNextOrderNumber();
 
       // Create order
       const order = await storage.createOrder({
@@ -268,6 +299,32 @@ export function createOrdersRouter() {
           isDefault: true,
         } as any);
       }
+
+      // Generate shipping label PDF
+      const PDFDocument = require('pdfkit');
+      const { sendOrderConfirmationEmail } = require('../services/email');
+      const doc = new PDFDocument();
+      let pdfChunks: Buffer[] = [];
+      doc.text(`Shipping Label for Order ${orderNumber}`);
+      doc.text(`Name: ${customerInfo.name}`);
+      doc.text(`Address: ${shippingAddress?.street1 || ''} ${shippingAddress?.street2 || ''}`);
+      doc.text(`City: ${shippingAddress?.city || ''}`);
+      doc.text(`State: ${shippingAddress?.state || ''}`);
+      doc.text(`Postal Code: ${shippingAddress?.postalCode || ''}`);
+      doc.text(`Country: USA`);
+      doc.end();
+      doc.on('data', (chunk: Buffer) => pdfChunks.push(chunk));
+      await new Promise(resolve => doc.on('end', resolve));
+      const pdfBuffer = Buffer.concat(pdfChunks);
+
+      // Send confirmation email with label PDF
+      await sendOrderConfirmationEmail({
+        to: customerInfo.email,
+        order,
+        orderNumber,
+        labelPdf: pdfBuffer,
+        shippingAddress,
+      });
 
       return res.json({ orderNumber, order });
     } catch (error: any) {
