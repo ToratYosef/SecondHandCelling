@@ -3048,6 +3048,7 @@ async function registerRoutes(app2) {
         if (!guestCompany) {
           guestCompany = await storage.createCompany({
             name: "Guest Orders",
+            legalName: "Guest Orders",
             slug: "guest-orders",
             type: "supplier",
             isActive: true
