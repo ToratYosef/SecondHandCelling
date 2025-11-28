@@ -13,7 +13,9 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 
 // db.ts
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
@@ -706,6 +708,9 @@ var insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 });
 
 // db.ts
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = dirname(__filename);
+config({ path: resolve(__dirname, "../.env") });
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
