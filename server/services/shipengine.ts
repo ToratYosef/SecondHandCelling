@@ -3,12 +3,12 @@ import axios from 'axios';
 interface ShipToAddress {
   name: string;
   phone?: string;
-  addressLine1: string;
-  addressLine2?: string;
-  cityLocality: string;
-  stateProvince: string;
-  postalCode: string;
-  countryCode: string;
+  address_line1: string;
+  address_line2?: string;
+  city_locality: string;
+  state_province: string;
+  postal_code: string;
+  country_code: string;
 }
 
 interface Package {
@@ -159,25 +159,28 @@ export class ShipEngineService {
       const shipTo: ShipToAddress = {
         name: process.env.SHIPENGINE_FROM_NAME || 'SHC',
         phone: process.env.SHIPENGINE_FROM_PHONE || '2015551234',
-        addressLine1: process.env.SHIPENGINE_FROM_ADDRESS1 || '1206 McDonald Ave',
-        addressLine2: process.env.SHIPENGINE_FROM_ADDRESS2 || 'Ste Rear',
-        cityLocality: process.env.SHIPENGINE_FROM_CITY || 'Brooklyn',
-        stateProvince: process.env.SHIPENGINE_FROM_STATE || 'NY',
-        postalCode: process.env.SHIPENGINE_FROM_POSTAL || '11230',
-        countryCode: 'US',
+        address_line1: process.env.SHIPENGINE_FROM_ADDRESS1 || '1206 McDonald Ave',
+        address_line2: process.env.SHIPENGINE_FROM_ADDRESS2 || 'Ste Rear',
+        city_locality: process.env.SHIPENGINE_FROM_CITY || 'Brooklyn',
+        state_province: process.env.SHIPENGINE_FROM_STATE || 'NY',
+        postal_code: process.env.SHIPENGINE_FROM_POSTAL || '11230',
+        country_code: 'US',
       };
 
       // Build ship_from address (customer - sending the device)
       const shipFrom: ShipToAddress = {
-        name: params.shipFrom.name,
-        phone: params.shipFrom.phone,
-        addressLine1: params.shipFrom.street1,
-        addressLine2: params.shipFrom.street2,
-        cityLocality: params.shipFrom.city,
-        stateProvince: normalizeState(params.shipFrom.state),
-        postalCode: params.shipFrom.postalCode,
-        countryCode: params.shipFrom.country || 'US',
+        name: params.shipFrom.name || 'Customer',
+        phone: params.shipFrom.phone || '0000000000',
+        address_line1: params.shipFrom.street1 || '',
+        address_line2: params.shipFrom.street2 || undefined,
+        city_locality: params.shipFrom.city || '',
+        state_province: normalizeState(params.shipFrom.state || 'NY'),
+        postal_code: params.shipFrom.postalCode || '',
+        country_code: params.shipFrom.country || 'US',
       };
+
+      console.log('[ShipEngine] Built ship_from:', JSON.stringify(shipFrom, null, 2));
+      console.log('[ShipEngine] Built ship_to:', JSON.stringify(shipTo, null, 2));
 
       // Default package weight (can be customized)
       const packageWeight = params.weight || 8; // default 8 oz for phones
