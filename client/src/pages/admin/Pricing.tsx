@@ -1,52 +1,54 @@
-import { AdminSidebar } from "@/components/AdminSidebar";
-import { AdminProtected } from "@/components/AdminProtected";
-import { Card } from "@/components/ui/card";
+import { AdminLayout } from "@/components/AdminLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Upload, CheckCircle, AlertCircle } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { useState } from "react";
 
-type BuybackPricingRule = {
-  id: string;
-  variantId: string;
-  conditionProfileId: string;
-  basePrice: string;
-  effectiveFrom: string;
-  effectiveTo: string | null;
-  penaltyFinancedDevice: string | null;
-  penaltyNoPower: string | null;
-  penaltyFunctionalIssue: string | null;
-  penaltyCrackedGlass: string | null;
-  penaltyActivationLock: string | null;
-};
-
 export default function AdminPricing() {
-    const [bulkEdit, setBulkEdit] = useState<Record<string, string>>({});
-    const [selectedRules, setSelectedRules] = useState<string[]>([]);
-    const [showAudit, setShowAudit] = useState(false);
-    const [auditLog, setAuditLog] = useState<any[]>([]);
+  const [xmlContent, setXmlContent] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: {
+      modelsCreated: number;
+      modelsUpdated: number;
+      variantsCreated: number;
+      priceTiersCreated: number;
+      errors: string[];
+    };
+  } | null>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setXmlContent(content);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!xmlContent.trim()) {
+      setUploadResult({
+        success: false,
+        message: "Please provide XML content",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadResult(null);
 
     // Bulk edit handler
     const handleBulkEditChange = (value: string) => {

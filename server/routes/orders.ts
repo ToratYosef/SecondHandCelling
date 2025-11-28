@@ -189,7 +189,7 @@ export function createOrdersRouter() {
           email: customerInfo.email,
           name: customerInfo.name || customerInfo.email.split('@')[0],
           passwordHash,
-          : 'customer',
+          role: 'buyer',
           isActive: true,
         });
       }
@@ -243,10 +243,9 @@ export function createOrdersRouter() {
         });
         // Resolve a real device variant for this model/storage/carrier
         let variants = await storage.getDeviceVariantsByModelId(d.modelId);
-        console.log('[submit-order] Found variants:', variants.map(v => ({ id: v.id, storage: v.storage, carrier: v.carrier })));
+        console.log('[submit-order] Found variants:', variants.map(v => ({ id: v.id, storage: v.storage })));
         let match = variants.find(v => (
-          (!d.storage || v.storage === d.storage) &&
-          (!d.carrier || v.carrier === d.carrier)
+          (!d.storage || v.storage === d.storage)
         )) || variants[0];
 
         if (!match) {
@@ -261,8 +260,7 @@ export function createOrdersRouter() {
           match = created;
           variants = [created];
         }
-        console.log('[submit-order] Using variant:', { id: match.id, storage: match.storage, carrier: match.carrier });
-
+        console.log('[submit-order] Using variant:', { id: match.id, storage: match.storage });
         await storage.createOrderItem({
           orderId: order.id,
           deviceVariantId: match.id,
