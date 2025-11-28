@@ -22,9 +22,6 @@
      - `SHIPENGINE_KEY`: Your ShipEngine API key
      - `PHONECHECK_USERNAME`: aecells1
      - `PHONECHECK_API_KEY`: Your PhoneCheck API key
-     - `STRIPE_SECRET_KEY`: Your Stripe secret key
-     - `STRIPE_PUBLISHABLE_KEY`: Your Stripe publishable key
-     - `STRIPE_WEBHOOK_SECRET`: Your Stripe webhook secret
    - Click "Apply" to deploy
 
 3. **Your API will be live at**: `https://shc-api.onrender.com`
@@ -70,7 +67,6 @@ All variables from `server/.env`:
 - `SHIPENGINE_KEY`, `SHIPENGINE_KEY_TEST`
 - `SHIPENGINE_FROM_*` (address details)
 - `PHONECHECK_USERNAME`, `PHONECHECK_API_KEY`
-- `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `SESSION_SECRET`
 - `CORS_ORIGINS`
 - `APP_FRONTEND_URL`

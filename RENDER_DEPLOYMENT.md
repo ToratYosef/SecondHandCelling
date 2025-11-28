@@ -52,10 +52,6 @@ SHIPENGINE_FROM_PHONE=2015551234
 IMEI_API=<your-imei-api-key>
 IMEI_USERNAME=<your-imei-username>
 IMEI_BASE_URL=https://clientapiv2.phonecheck.com
-
-# Stripe
-STRIPE_SECRET_KEY=<your-stripe-secret-key>
-STRIPE_PUBLISHABLE_KEY=<your-stripe-publishable-key>
 ```
 
 ## Deploy Backend to Render

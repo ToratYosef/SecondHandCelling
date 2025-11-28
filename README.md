@@ -1,12 +1,11 @@
 # SHC-API
 
-SecondHandCell API - Express.js backend with PostgreSQL (Neon), Stripe payments, email notifications, and shipping integrations.
+SecondHandCell API - Express.js backend with PostgreSQL (Neon), email notifications, and shipping integrations.
 
 ## Features
 
 - 🗄️ **PostgreSQL Database** with Drizzle ORM (Neon serverless)
 - 📧 **Email Service** via Nodemailer (Gmail SMTP)
-- 💳 **Stripe Integration** for payment processing
 - 📦 **Shipping Services**: ShipStation & ShipEngine APIs
 - 📱 **IMEI/ESN Validation** via PhoneCheck API
 - 🔐 **Session Management** with express-session
@@ -85,7 +84,6 @@ Required variables (see `.env.example`):
 - `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` - Email configuration
 - `SHIPENGINE_KEY` - ShipEngine API key
 - `PHONECHECK_API_KEY` - PhoneCheck API key
-- `STRIPE_SECRET_KEY` - Stripe secret key
 - `SESSION_SECRET` - Session encryption secret
 - `CORS_ORIGINS` - Allowed CORS origins
 
@@ -111,7 +109,6 @@ npm run check        # TypeScript type checking
 - **Language**: TypeScript
 - **Build**: Vite + esbuild
 - **Email**: Nodemailer
-- **Payments**: Stripe
 - **Shipping**: ShipStation, ShipEngine
 - **Device Validation**: PhoneCheck
 

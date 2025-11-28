@@ -2,7 +2,7 @@
 
 ## Design Approach
 
-**System:** Tailwind CSS + shadcn/ui with commerce-focused customization inspired by Stripe's professional clarity and Apple's trade-in experience simplicity.
+**System:** Tailwind CSS + shadcn/ui with commerce-focused customization inspired by professional clarity and Apple's trade-in experience simplicity.
 
 **Core Principle:** Build trust through clean professionalism, transparent pricing displays, and effortless quote-to-payout journey.
 
@@ -108,7 +108,7 @@
 - Optional: Small circular avatars (if using real photos), otherwise use initials in colored circles
 
 **Marketing Sections:**
-- Trust badges: SSL, BBB, payment provider logos (Stripe, PayPal) in grayscale, 120x40px
+- Trust badges: SSL, BBB, payment provider logos (PayPal) in grayscale, 120x40px
 - Optional feature section background: Abstract circuit board or tech pattern, very subtle opacity
 
 ---

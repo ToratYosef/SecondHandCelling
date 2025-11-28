@@ -32,10 +32,6 @@ IMEI_BASE_URL=https://clientapiv2.phonecheck.com
 
 # Frontend URL
 APP_FRONTEND_URL=https://buyback-a0f05.web.app
-
-# Stripe (if needed)
-STRIPE_SECRET_KEY="sk_test_51RZEPeCMmspEQNuYocbevinHQf6Npcuwnq9wVKh667n4IucBHUZWPeAeBVYcRKZjutgHp1Gpy5uJ5oac9rmILnU700AaQSRTdJ"
-STRIPE_PUBLISHABLE_KEY="pk_test_51RZEPeCMmspEQNuYXLdVBGpSSPewOBaH5d4eSIwrSDBeEsW9pBh7WAyDwFn8IzNyrYIY2SuV3pDXiNTmvJnr7YpC00JPzJh1lP"
 ```
 
 ---

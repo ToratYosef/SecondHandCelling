@@ -76,7 +76,7 @@ export default function Privacy() {
               <p>Third-party vendors who perform services on our behalf:</p>
               <ul>
                 <li>Shipping carriers (UPS, FedEx, USPS)</li>
-                <li>Payment processors (PayPal, Stripe)</li>
+                <li>Payment processors (PayPal)</li>
                 <li>Data wipe certification services</li>
                 <li>Cloud hosting providers</li>
                 <li>Analytics providers (Google Analytics)</li>

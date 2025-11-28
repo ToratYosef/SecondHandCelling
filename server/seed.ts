@@ -329,7 +329,7 @@ async function seed() {
 
     await storage.createFaq({
       question: "What payment methods do you accept?",
-      answer: "We accept credit cards (via Stripe), wire transfers, ACH payments, and offer net terms (Net 15/30) for qualified approved accounts. Payment method availability depends on your account status and credit approval.",
+      answer: "We accept wire transfers, ACH payments, and offer net terms (Net 15/30) for qualified approved accounts. Payment method availability depends on your account status and credit approval.",
       category: "Orders & Payments",
       displayOrder: 1,
       isActive: true,
