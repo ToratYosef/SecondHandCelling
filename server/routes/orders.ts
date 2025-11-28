@@ -257,12 +257,15 @@ export function createOrdersRouter() {
       if (shippingAddress) {
         await storage.createShippingAddress({
           companyId: guestCompany.id,
-          name: shippingAddress.contactName,
+          contactName: shippingAddress.contactName || customerInfo.name || customerInfo.email,
+          phone: shippingAddress.phone || customerInfo.phone || "",
           street1: shippingAddress.street1,
+          street2: (shippingAddress as any).street2 || null,
           city: shippingAddress.city,
           state: shippingAddress.state,
           postalCode: shippingAddress.postalCode,
-          phone: shippingAddress.phone,
+          country: "USA",
+          isDefault: true,
         } as any);
       }
 
