@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Check, Download, Package } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { getApiUrl } from "@/lib/api";
 
 export default function Success() {
   const [, setLocation] = useLocation();
-  const searchParams = new URLSearchParams(useSearch());
+  const searchParams = new URLSearchParams(useSearch() || "");
   const orderNumber = searchParams.get('order');
 
   // Fetch order details to get shipment info
@@ -61,11 +61,10 @@ export default function Success() {
   }
 
   const deviceName = order?.items?.[0]?.deviceModel?.name || 'Your device';
-  const storage = order?.items?.[0]?.deviceVariant?.storageGb
-    ? `${order.items[0].deviceVariant.storageGb}GB`
-    : '';
-  const offerAmount = order?.totalOriginalOffer || order?.total || 0;
-  const shipment = useMemo(() => order?.shipments?.[0], [order]);
+  const storageRaw = order?.items?.[0]?.deviceVariant?.storageGb ?? order?.items?.[0]?.deviceVariant?.storage;
+  const storage = storageRaw ? `${storageRaw}GB` : '';
+  const offerAmount = typeof order?.totalOriginalOffer === 'number' ? order?.totalOriginalOffer : (typeof order?.total === 'number' ? order?.total : 0);
+  const shipment = order?.shipments?.[0];
 
   // Debug logging
   console.log('[Success] Order:', order?.id);
