@@ -30,8 +30,7 @@ import AccountOrders from "@/pages/account/Orders";
 import AccountOrderDetail from "@/pages/account/OrderDetail";
 import AccountSettings from "@/pages/account/Settings";
 
-// Admin Pages (disabled view)
-import AdminDisabled from "@/pages/admin/Disabled";
+// Admin Pages
 import AdminOrders from "@/pages/admin/Orders";
 import AdminPricing from "@/pages/admin/Pricing";
 
@@ -69,17 +68,7 @@ function Router() {
       <Route path="/account/settings" component={AccountSettings} />
       
       {/* Admin Portal */}
-      <Route path="/admin/dashboard" component={AdminDisabled} />
-      <Route path="/admin/dashboard-old" component={AdminDisabled} />
-      <Route path="/admin/aging" component={AdminDisabled} />
-      <Route path="/admin/analytics" component={AdminDisabled} />
-      <Route path="/admin/print-queue" component={AdminDisabled} />
-      <Route path="/admin/clicks" component={AdminDisabled} />
-      <Route path="/admin/email" component={AdminDisabled} />
-      <Route path="/admin/devices" component={AdminDisabled} />
       <Route path="/admin/orders" component={AdminOrders} />
-      <Route path="/admin/inspections" component={AdminDisabled} />
-      <Route path="/admin/inspections/:orderNumber" component={AdminDisabled} />
       <Route path="/admin/pricing" component={AdminPricing} />
       
       {/* Fallback to 404 */}
