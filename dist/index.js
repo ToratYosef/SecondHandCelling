@@ -120,7 +120,22 @@ var companyUserRoleEnum = ["owner", "admin", "buyer"];
 var conditionGradeEnum = ["A", "B", "C", "D"];
 var networkLockStatusEnum = ["unlocked", "locked", "other"];
 var inventoryStatusEnum = ["in_stock", "reserved", "incoming", "discontinued"];
-var orderStatusEnum = ["pending_payment", "payment_review", "processing", "shipped", "completed", "cancelled"];
+var orderStatusEnum = [
+  "pending_payment",
+  "payment_review",
+  "processing",
+  "shipped",
+  "label_pending",
+  "awaiting_device",
+  "in_transit",
+  "received",
+  "under_inspection",
+  "reoffer_sent",
+  "payout_pending",
+  "completed",
+  "cancelled",
+  "returned_to_customer"
+];
 var paymentStatusEnum = ["unpaid", "paid", "partially_paid", "refunded"];
 var paymentMethodEnum = ["card", "wire", "ach", "terms", "other"];
 var quoteStatusEnum = ["draft", "sent", "accepted", "rejected", "expired"];
@@ -1029,9 +1044,6 @@ import bcrypt from "bcrypt";
 import Stripe from "stripe";
 import { z } from "zod";
 
-// server/routes/emails.ts
-import { Router } from "express";
-
 // server/services/email.ts
 import nodemailer from "nodemailer";
 var transporter = null;
@@ -1066,6 +1078,9 @@ async function sendEmail(mailOptions) {
     throw error;
   }
 }
+
+// server/routes/emails.ts
+import { Router } from "express";
 
 // server/helpers/emailTemplates.ts
 var EMAIL_LOGO_URL = "https://raw.githubusercontent.com/ToratYosef/BuyBacking/refs/heads/main/assets/logo.png";
@@ -3037,7 +3052,7 @@ Notes: ${notes2}` : ""}`;
           orderNumber: orderNumber2,
           companyId: guestCompany.id,
           createdByUserId: guestUser.id,
-          status: "pending_payment",
+          status: "label_pending",
           subtotal: total2.toFixed(2),
           shippingCost: "0",
           taxAmount: "0",
@@ -3053,8 +3068,20 @@ Notes: ${notes2}` : ""}`;
         console.log("[POST /api/orders] Guest order created:", order2.id, orderNumber2);
         res.json({
           success: true,
+          order: {
+            id: order2.id,
+            orderNumber: order2.orderNumber,
+            status: order2.status,
+            total: order2.total,
+            currency: order2.currency,
+            createdAt: order2.createdAt
+          },
           orderId: order2.id,
           orderNumber: order2.orderNumber,
+          shipment: null,
+          // No shipment created yet for guest orders
+          labelUrl: null,
+          // No label yet
           message: "Order submitted successfully"
         });
         return;
@@ -3131,6 +3158,29 @@ Notes: ${notes2}` : ""}`;
       res.status(500).json({ error: "Failed to get orders" });
     }
   });
+  app2.get("/api/orders/by-number/:orderNumber", async (req, res) => {
+    try {
+      console.log("[GET /api/orders/by-number] Order number:", req.params.orderNumber);
+      const order = await storage.getOrderByNumber(req.params.orderNumber);
+      if (!order) {
+        console.log("[GET /api/orders/by-number] Order not found");
+        return res.status(404).json({ error: "Order not found" });
+      }
+      const items = await storage.getOrderItems(order.id);
+      const payments2 = await storage.getPaymentsByOrderId(order.id);
+      const shipments2 = await storage.getShipmentsByOrderId(order.id);
+      console.log("[GET /api/orders/by-number] Order found:", {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        itemsCount: items.length,
+        shipmentsCount: shipments2.length
+      });
+      res.json({ ...order, items, payments: payments2, shipments: shipments2 });
+    } catch (error) {
+      console.error("Get order by number error:", error);
+      res.status(500).json({ error: "Failed to get order" });
+    }
+  });
   app2.get("/api/orders/:orderNumber", requireAuth, async (req, res) => {
     try {
       const order = await storage.getOrderByNumber(req.params.orderNumber);
@@ -3143,32 +3193,6 @@ Notes: ${notes2}` : ""}`;
       res.json({ ...order, items, payments: payments2, shipments: shipments2 });
     } catch (error) {
       console.error("Get order error:", error);
-      res.status(500).json({ error: "Failed to get order" });
-    }
-  });
-  app2.get("/api/orders/by-number/:orderNumber", async (req, res) => {
-    try {
-      const order = await storage.getOrderByNumber(req.params.orderNumber);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      const items = await storage.getOrderItems(order.id);
-      const safeItems = items.map((i) => ({
-        deviceVariantId: i.deviceVariantId,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice
-      }));
-      res.json({
-        id: order.id,
-        orderNumber: order.orderNumber,
-        status: order.status,
-        total: order.total,
-        currency: order.currency,
-        createdAt: order.createdAt,
-        items: safeItems
-      });
-    } catch (error) {
-      console.error("Public get order by number error:", error);
       res.status(500).json({ error: "Failed to get order" });
     }
   });
@@ -3788,7 +3812,25 @@ Notes: ${notes2}` : ""}`;
   app2.get("/api/admin/orders", requireAdmin, async (req, res) => {
     try {
       const orders2 = await storage.getAllOrders();
-      res.json(orders2);
+      const enhancedOrders = await Promise.all(
+        orders2.map(async (order) => {
+          const [user, company, shipments2, items] = await Promise.all([
+            storage.getUser(order.createdByUserId),
+            storage.getCompany(order.companyId),
+            storage.getShipmentsByOrderId(order.id),
+            storage.getOrderItems(order.id)
+          ]);
+          return {
+            ...order,
+            customerEmail: user?.email,
+            customerName: user?.name,
+            companyName: company?.name,
+            shipments: shipments2,
+            items
+          };
+        })
+      );
+      res.json(enhancedOrders);
     } catch (error) {
       console.error("Get all orders error:", error);
       res.status(500).json({ error: "Failed to get orders" });
@@ -3999,9 +4041,10 @@ Notes: ${notes2}` : ""}`;
   });
   app2.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
     try {
-      const { status } = req.body;
+      const { status, paymentStatus } = req.body;
       const updates = {};
       if (status) updates.status = status;
+      if (paymentStatus) updates.paymentStatus = paymentStatus;
       const order = await storage.updateOrder(req.params.id, updates);
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
@@ -4017,6 +4060,54 @@ Notes: ${notes2}` : ""}`;
     } catch (error) {
       console.error("Update order error:", error);
       res.status(500).json({ error: "Failed to update order" });
+    }
+  });
+  app2.post("/api/admin/orders/:id/reoffer", requireAdmin, async (req, res) => {
+    try {
+      const { amount, message, email } = req.body || {};
+      const parsedAmount = parseFloat(amount);
+      if (Number.isNaN(parsedAmount)) {
+        return res.status(400).json({ error: "A valid reoffer amount is required" });
+      }
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      const user = await storage.getUser(order.createdByUserId);
+      const recipient = email || user?.email;
+      if (!recipient) {
+        return res.status(400).json({ error: "No recipient email found for this order" });
+      }
+      const formattedAmount = parsedAmount.toFixed(2);
+      const emailBody = `
+        <p>Hi ${user?.name || "there"},</p>
+        <p>We've completed the inspection for order <strong>${order.orderNumber}</strong>.</p>
+        <p>Your updated offer is <strong>$${formattedAmount}</strong>.</p>
+        ${message ? `<p>${message}</p>` : ""}
+        <p>Please reply to this email to accept or decline the updated offer.</p>
+        <p>Thank you,<br/>SecondHandCell Team</p>
+      `;
+      await sendEmail({
+        to: recipient,
+        subject: `Updated offer for order ${order.orderNumber}`,
+        html: emailBody
+      });
+      const noteLine = `[${(/* @__PURE__ */ new Date()).toISOString()}] Reoffer sent for $${formattedAmount}${message ? ` - ${message}` : ""}`;
+      const updatedOrder = await storage.updateOrder(req.params.id, {
+        status: "reoffer_sent",
+        notesInternal: [order.notesInternal || "", noteLine].filter(Boolean).join("\n")
+      });
+      await storage.createAuditLog({
+        actorUserId: req.session.userId,
+        action: "order_reoffer_sent",
+        entityType: "order",
+        entityId: req.params.id,
+        newValues: JSON.stringify({ amount: formattedAmount, message })
+      });
+      res.json({ message: "Reoffer email sent", order: updatedOrder });
+    } catch (error) {
+      console.error("Failed to send reoffer email:", error);
+      res.status(500).json({ error: "Unable to send reoffer email" });
     }
   });
   app2.get("/api/admin/users", requireAdmin, async (req, res) => {
@@ -4265,37 +4356,6 @@ ${message}`,
     } catch (error) {
       console.error("Quick stats error:", error);
       res.status(500).json({ error: "Failed to get quick stats" });
-    }
-  });
-  app2.post("/api/setup-admin", async (req, res) => {
-    try {
-      const { setupKey } = req.body;
-      if (setupKey !== process.env.SETUP_ADMIN_KEY && setupKey !== "shc-setup-2024") {
-        return res.status(403).json({ error: "Invalid setup key" });
-      }
-      const existingAdmin = await storage.getUserByEmail("admin@secondhandcell.com");
-      if (existingAdmin) {
-        return res.json({ message: "Admin already exists", email: "admin@secondhandcell.com" });
-      }
-      const adminPassword = await bcrypt.hash("Admin123!", 10);
-      const adminUser = await storage.createUser({
-        name: "Admin User",
-        email: "admin@secondhandcell.com",
-        passwordHash: adminPassword,
-        role: "super_admin",
-        phone: "+1-555-0100",
-        isActive: true
-      });
-      res.json({
-        success: true,
-        message: "Admin created successfully",
-        email: "admin@secondhandcell.com",
-        password: "Admin123!",
-        userId: adminUser.id
-      });
-    } catch (error) {
-      console.error("Setup admin error:", error);
-      res.status(500).json({ error: "Failed to create admin: " + error.message });
     }
   });
   const httpServer = createServer(app2);
