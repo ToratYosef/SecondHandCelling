@@ -255,8 +255,11 @@ export default function Sell() {
   };
 
   const handlePaymentSubmit = async () => {
+    // Show loading while submitting
+    setIsSubmitting(true);
     if (paymentUsername !== paymentUsernameConfirm) {
       alert("Usernames do not match!");
+      setIsSubmitting(false);
       return;
     }
 
@@ -310,6 +313,9 @@ export default function Sell() {
     } catch (err: any) {
       console.error("Order submission failed:", err);
       alert("Order submission failed: " + err.message);
+    } finally {
+      // Hide loading once we have a response
+      setIsSubmitting(false);
     }
   };
 

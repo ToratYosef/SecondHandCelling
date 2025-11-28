@@ -321,7 +321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json({ success: true });
   });
   
-  // Register new user and company
+  // Register new user (no company)
   app.post("/api/auth/register", async (req, res) => {
     try {
       const registerSchema = z.object({
@@ -330,20 +330,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: z.string().email(),
         phone: z.string(),
         password: z.string().min(6),
-        // Company data
-        companyName: z.string(),
-        legalName: z.string(),
-        website: z.string().optional(),
-        taxId: z.string().optional(),
-        businessType: z.string(),
-        // Address data
-        contactName: z.string(),
-        addressPhone: z.string(),
-        street1: z.string(),
-        street2: z.string().optional(),
-        city: z.string(),
-        state: z.string(),
-        postalCode: z.string(),
       });
 
       const data = registerSchema.parse(req.body);
@@ -367,40 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true,
       });
 
-      // Create company
-      const company = await storage.createCompany({
-        name: data.companyName,
-        legalName: data.legalName,
-        website: data.website || null,
-        taxId: data.taxId || null,
-        primaryPhone: data.phone,
-        billingEmail: data.email,
-        status: "pending_review",
-        creditLimit: "0",
-      });
-
-      // Link user to company as owner
-      await storage.createCompanyUser({
-        userId: user.id,
-        companyId: company.id,
-        roleInCompany: "owner",
-      });
-
-      // Create first shipping address
-      await storage.createShippingAddress({
-        companyId: company.id,
-        contactName: data.contactName,
-        phone: data.addressPhone,
-        street1: data.street1,
-        street2: data.street2 || null,
-        city: data.city,
-        state: data.state,
-        postalCode: data.postalCode,
-        country: "USA",
-        isDefault: true,
-      });
-
-      res.json({ success: true, userId: user.id, companyId: company.id });
+      res.json({ success: true, userId: user.id });
     } catch (error: any) {
       console.error("Registration error:", error);
       res.status(400).json({ error: error.message || "Registration failed" });
@@ -579,13 +532,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[/api/auth/me] User found:', { id: user.id, email: user.email, role: user.role });
 
-      // Get user's company
-      const companyUsers = await storage.getCompanyUsersByUserId(user.id);
-      let companyId = null;
-      if (companyUsers.length > 0) {
-        companyId = companyUsers[0].companyId;
-      }
-
       res.json({
         user: {
           id: user.id,
@@ -593,7 +539,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: user.email,
           role: user.role,
           phone: user.phone,
-          companyId,
         }
       });
     } catch (error: any) {
@@ -610,19 +555,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      const companyUsers = await storage.getCompanyUsersByUserId(user.id);
-      let companyId = null;
-      if (companyUsers.length > 0) {
-        companyId = companyUsers[0].companyId;
-      }
-
       res.json({
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
         phone: user.phone,
-        companyId,
       });
     } catch (error: any) {
       console.error("Get user error:", error);
@@ -630,32 +568,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get the company for the authenticated user
-  app.get("/api/auth/company", requireAuth, async (req, res) => {
-    try {
-      const companyContext = await getUserPrimaryCompany(req.session.userId!);
-      if (!companyContext) {
-        return res.status(404).json({ error: "User does not belong to a company" });
-      }
-
-      const company = await storage.getCompany(companyContext.companyId);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
-      }
-
-      res.json({
-        ...company,
-        roleInCompany: companyContext.roleInCompany,
-      });
-    } catch (error: any) {
-      console.error("Get company error:", error);
-      res.status(500).json({ error: "Failed to load company" });
-    }
-  });
+  // (Auth company route removed)
 
   // ==================== PROFILE ROUTES ====================
   
-  // Get user profile with company details
+  // Get user profile
   app.get("/api/profile", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
@@ -663,24 +580,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Get user's company information
-      const companyUsers = await storage.getCompanyUsersByUserId(user.id);
-      let company = null;
-      let roleInCompany = null;
-
-      if (companyUsers.length > 0) {
-        company = await storage.getCompany(companyUsers[0].companyId);
-        roleInCompany = companyUsers[0].roleInCompany;
-      }
-
       // Exclude password hash from response
       const { passwordHash, ...userWithoutPassword } = user;
 
-      res.json({
-        ...userWithoutPassword,
-        company,
-        roleInCompany,
-      });
+      res.json(userWithoutPassword);
     } catch (error: any) {
       console.error("Get profile error:", error);
       res.status(500).json({ error: "Failed to get profile" });

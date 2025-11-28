@@ -200,6 +200,9 @@ export class ShipEngineService {
           ],
         },
         test_label: this.testMode,
+        // Prefer PDF format when available
+        // @ts-ignore
+        label_format: 'pdf',
       };
 
       console.log('[ShipEngine] Creating label with request:', JSON.stringify(requestBody, null, 2));
@@ -219,6 +222,7 @@ export class ShipEngineService {
         label_id: response.data.label_id,
         tracking_number: response.data.tracking_number,
         pdf_url: response.data.label_download?.pdf,
+        href: response.data.label_download?.href,
       });
 
       return response.data;
