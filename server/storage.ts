@@ -59,6 +59,7 @@ export interface IStorage {
   getDeviceModel(id: string): Promise<DeviceModel | undefined>;
   getDeviceModelBySlug(slug: string): Promise<DeviceModel | undefined>;
   createDeviceModel(model: InsertDeviceModel): Promise<DeviceModel>;
+  updateDeviceModel(id: string, updates: Partial<DeviceModel>): Promise<DeviceModel | undefined>;
   
   // Device Variant methods
   getDeviceVariant(id: string): Promise<DeviceVariant | undefined>;
@@ -253,6 +254,11 @@ export class DatabaseStorage implements IStorage {
   async createDeviceModel(insertModel: InsertDeviceModel): Promise<DeviceModel> {
     const [model] = await db.insert(schema.deviceModels).values(insertModel).returning();
     return model;
+  }
+
+  async updateDeviceModel(id: string, updates: Partial<DeviceModel>): Promise<DeviceModel | undefined> {
+    const [model] = await db.update(schema.deviceModels).set(updates).where(eq(schema.deviceModels.id, id)).returning();
+    return model || undefined;
   }
 
   // Device Variant methods

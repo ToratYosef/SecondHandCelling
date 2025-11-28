@@ -23,6 +23,7 @@ import { createImeiRouter } from "./routes/imei";
 import { createLabelsRouter } from "./routes/labels";
 import { createOrdersRouter } from "./routes/orders";
 import { createWebhookRouter } from "./routes/webhook";
+import { createAdminPricingRouter } from "./routes/admin-pricing";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 // Lightweight Stack Auth JWT handling (claim validation only)
 const STACK_ISSUER = process.env.STACK_AUTH_ISSUER || "https://stack-auth.com";
@@ -209,6 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", createLabelsRouter());
   app.use("/api", createOrdersRouter());
   app.use("/api", createWebhookRouter());
+  app.use("/api/admin/pricing", createAdminPricingRouter());
 
   // ==================== HEALTH CHECK ====================
   
