@@ -23,6 +23,25 @@ import { createImeiRouter } from "./routes/imei";
 import { createLabelsRouter } from "./routes/labels";
 import { createOrdersRouter } from "./routes/orders";
 import { createWebhookRouter } from "./routes/webhook";
+import { jwtVerify, createRemoteJWKSet } from "jose";
+// Lightweight Stack Auth JWT handling (claim validation only)
+const STACK_ISSUER = process.env.STACK_AUTH_ISSUER || "https://stack-auth.com";
+const STACK_AUDIENCE = process.env.STACK_AUTH_AUDIENCE || undefined;
+const STACK_JWKS_URL = process.env.STACK_AUTH_JWKS_URL || undefined;
+
+async function verifyJwt(token: string): Promise<any | null> {
+  try {
+    if (!STACK_JWKS_URL) return null;
+    const JWKS = createRemoteJWKSet(new URL(STACK_JWKS_URL));
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: STACK_ISSUER,
+      audience: STACK_AUDIENCE,
+    });
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 const slugify = (value: string) =>
   value
@@ -148,6 +167,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   }));
 
+  // Attach user from Bearer token (Stack Auth) if present
+  app.use(async (req, _res, next) => {
+    try {
+      const auth = req.headers.authorization || "";
+      if (auth.startsWith("Bearer ")) {
+        const token = auth.slice(7);
+        const claims = await verifyJwt(token);
+        if (claims && claims.sub) {
+          req.session.userId = claims.sub as string;
+          req.session.userRole = (claims as any).role || req.session.userRole;
+        }
+      }
+    } catch {}
+    next();
+  });
+
   // Debug middleware to log session info
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/admin') || req.path === '/api/auth/me') {
@@ -255,6 +290,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== AUTH ROUTES ====================
+  // Stack Auth callback to establish session from token in query
+  app.get("/api/auth/stack/callback", async (req, res) => {
+    const token = (req.query.token as string) || "";
+    const claims = token ? await verifyJwt(token) : null;
+    if (!claims || !claims.sub) {
+      return res.status(400).json({ error: "Invalid token" });
+    }
+
+    // Upsert user if not exists (email may be present in claims)
+    const email = (claims as any).email as string | undefined;
+    const name = (claims as any).name as string | undefined;
+    let user = email ? await storage.getUserByEmail(email) : null;
+    if (!user && email) {
+      user = await storage.createUser({
+        name: name || email.split("@")[0],
+        email,
+        phone: "",
+        passwordHash: await bcrypt.hash(Math.random().toString(36), 10),
+        role: "customer",
+        isActive: true,
+      });
+    }
+
+    // Set session
+    req.session.userId = user?.id || (claims.sub as string);
+    req.session.userRole = user?.role || (claims as any).role || "customer";
+    return res.json({ success: true });
+  });
   
   // Register new user and company
   app.post("/api/auth/register", async (req, res) => {

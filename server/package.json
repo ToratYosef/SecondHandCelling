@@ -20,6 +20,7 @@
     "express": "^4.21.2",
     "express-session": "^1.18.2",
     "memorystore": "^1.6.7",
+    "jose": "^5.2.2",
     "nanoid": "^5.0.9",
     "vite": "^5.4.20",
     "zod": "^3.24.2"

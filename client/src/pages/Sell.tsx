@@ -19,6 +19,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { getApiUrl } from "@/lib/api";
+import AuthPrompt from "@/components/AuthPrompt";
 
 type DeviceBrand = {
   id: string;
@@ -66,6 +67,7 @@ export default function Sell() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showRejectionDialog, setShowRejectionDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
 
   const { data: brands = [] } = useQuery<DeviceBrand[]>({
     queryKey: ["/api/brands"],
@@ -197,6 +199,7 @@ export default function Sell() {
   };
 
   const handleContinueAsGuest = () => {
+    setShowAuthPrompt(false);
     setStep('shipping');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -561,12 +564,12 @@ export default function Sell() {
               </div>
 
               <Button
-                onClick={handleContinueAsGuest}
+                onClick={() => setShowAuthPrompt(true)}
                 className="w-full"
                 size="lg"
                 data-testid="button-continue-guest"
               >
-                Continue as Guest
+                Continue
               </Button>
             </Card>
           )}
@@ -850,6 +853,14 @@ export default function Sell() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Auth Prompt Modal */}
+      {showAuthPrompt && (
+        <AuthPrompt
+          onClose={() => setShowAuthPrompt(false)}
+          onContinueGuest={handleContinueAsGuest}
+        />
+      )}
 
       {/* Rejection Dialog */}
       <Dialog open={showRejectionDialog} onOpenChange={setShowRejectionDialog}>
