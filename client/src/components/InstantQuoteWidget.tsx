@@ -111,7 +111,7 @@ export function InstantQuoteWidget() {
         paymentMethod,
         notes: `Address: ${address}, ${city}, ${state}, ${zipCode}; payout: ${paymentMethod}; username: ${paymentUsername}`,
       };
-      const submitRes = await fetch(getApiUrl("/api/orders"), {
+      const submitRes = await fetch(getApiUrl("/api/submit-order"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

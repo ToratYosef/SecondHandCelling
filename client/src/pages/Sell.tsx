@@ -246,7 +246,7 @@ export default function Sell() {
     };
 
     try {
-      const res = await fetch(getApiUrl("/api/orders"), {
+      const res = await fetch(getApiUrl("/api/submit-order"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
